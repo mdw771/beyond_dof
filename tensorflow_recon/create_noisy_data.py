@@ -40,7 +40,6 @@ if is_ptycho:
             snr_ls.append(snr)
             data = np.sqrt(prj_o_inten_noisy)
             n[i, j] = data.astype('complex64')
-
 else:
     for i in trange(o.shape[0]):
         prj_o = o[i]

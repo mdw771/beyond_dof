@@ -36,8 +36,8 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
     def rotate_and_project(i, obj):
 
         # obj_rot = apply_rotation(obj, coord_ls[rand_proj], 'arrsize_64_64_64_ntheta_500')
-        obj_rot = tf_rotate(obj, this_theta_batch[i], interpolation='BILINEAR')
-        probe_pos_batch_ls = split_tasks(probe_pos, n_dp_batch)
+        obj_rot = tf_rotate(obj, theta_placeholder[i], interpolation='BILINEAR')
+        probe_pos_batch_ls = pos_placeholder
         exiting_ls = []
         # loss = tf.constant(0.0)
 
@@ -61,37 +61,36 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
             pad_arr[1, 1] = pad_len
 
         ind = 0
-        for k, pos_batch in enumerate(probe_pos_batch_ls):
-            subobj_ls = []
-            for j, pos in enumerate(pos_batch):
-                pos = [int(x) for x in pos]
-                # ind = np.reshape([[x, y] for x in range(int(pos[0]) - probe_size_half[0], int(pos[0]) - probe_size_half[0] + probe_size[0])
-                #                   for y in range(int(pos[1]) - probe_size_half[1], int(pos[1]) - probe_size_half[1] + probe_size[1])],
-                #                  [probe_size[0], probe_size[1], 2])
-                # subobj = tf.gather_nd(obj_rot, ind)
-                pos[0] = pos[0] + pad_arr[0, 0]
-                pos[1] = pos[1] + pad_arr[1, 0]
-                subobj = obj_rot[pos[0] - probe_size_half[0]:pos[0] - probe_size_half[0] + probe_size[0],
-                                 pos[1] - probe_size_half[1]:pos[1] - probe_size_half[1] + probe_size[1],
-                                 :, :]
-                subobj_ls.append(subobj)
+        subobj_ls = []
+        for j in range(minibatch_size):
+            pos = pos_placeholder[j]
+            # ind = np.reshape([[x, y] for x in range(int(pos[0]) - probe_size_half[0], int(pos[0]) - probe_size_half[0] + probe_size[0])
+            #                   for y in range(int(pos[1]) - probe_size_half[1], int(pos[1]) - probe_size_half[1] + probe_size[1])],
+            #                  [probe_size[0], probe_size[1], 2])
+            # subobj = tf.gather_nd(obj_rot, ind)
+            pos[0] = pos[0] + pad_arr[0, 0]
+            pos[1] = pos[1] + pad_arr[1, 0]
+            subobj = obj_rot[pos[0] - probe_size_half[0]:pos[0] - probe_size_half[0] + probe_size[0],
+                             pos[1] - probe_size_half[1]:pos[1] - probe_size_half[1] + probe_size[1],
+                             :, :]
+            subobj_ls.append(subobj)
 
-            subobj_ls = tf.stack(subobj_ls)
-            if forward_algorithm == 'fresnel':
-                exiting = multislice_propagate_batch(subobj_ls[:, :, :, :, 0], subobj_ls[:, :, :, :, 1], probe_real, probe_imag,
-                                                     energy_ev, psize_cm * ds_level, h=h, free_prop_cm='inf',
-                                                     obj_batch_shape=[len(pos_batch), *probe_size, obj_size[-1]])
-            elif forward_algorithm == 'fd':
-                exiting = multislice_propagate_fd(subobj_ls[:, :, :, :, 0], subobj_ls[:, :, :, :, 1], probe_real, probe_imag,
-                                                  energy_ev, psize_cm * ds_level, h=h, free_prop_cm='inf',
-                                                  obj_batch_shape=[len(pos_batch), *probe_size, obj_size[-1]])
-            # loss += tf.reduce_mean(tf.squared_difference(tf.abs(exiting), tf.abs(this_prj_batch[i][ind:ind+len(pos_batch)]))) * n_pos
-            # ind += len(pos_batch)
-            exiting_ls.append(exiting)
-        exiting_ls = tf.concat(exiting_ls, 0)
+        subobj_ls = tf.stack(subobj_ls)
+        if forward_algorithm == 'fresnel':
+            exiting = multislice_propagate_batch(subobj_ls[:, :, :, :, 0], subobj_ls[:, :, :, :, 1], probe_real, probe_imag,
+                                                 energy_ev, psize_cm * ds_level, h=h, free_prop_cm='inf',
+                                                 obj_batch_shape=[minibatch_size, *probe_size, obj_size[-1]])
+        elif forward_algorithm == 'fd':
+            exiting = multislice_propagate_fd(subobj_ls[:, :, :, :, 0], subobj_ls[:, :, :, :, 1], probe_real, probe_imag,
+                                              energy_ev, psize_cm * ds_level, h=h, free_prop_cm='inf',
+                                              obj_batch_shape=[minibatch_size, *probe_size, obj_size[-1]])
+        # loss += tf.reduce_mean(tf.squared_difference(tf.abs(exiting), tf.abs(this_prj_batch[i][ind:ind+len(pos_batch)]))) * n_pos
+        # ind += len(pos_batch)
+        # exiting_ls.append(exiting)
+        # exiting_ls = tf.concat(exiting_ls, 0)
         if probe_circ_mask is not None:
             exiting_ls = exiting_ls * probe_mask
-        loss = tf.reduce_mean(tf.squared_difference(tf.abs(exiting_ls), tf.abs(this_prj_batch[i]))) * n_pos
+        loss = tf.reduce_mean(tf.squared_difference(tf.abs(exiting), tf.abs(prj_placeholder))) * minibatch_size
         loss = tf.identity(loss, name='loss')
 
         return loss
@@ -195,11 +194,14 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
         #     buffer_size=100).repeat().batch(minibatch_size)
         # prj_iter = prj_dataset.make_one_shot_iterator()
         # this_theta_batch, this_prj_batch = prj_iter.get_next()
-        theta_placeholder = tf.placeholder(theta.dtype, minibatch_size * hvd.size())
-        prj_placeholder = tf.placeholder(prj.dtype, [minibatch_size * hvd.size(), *prj_shape[1:]])
-        prj_dataset = tf.data.Dataset.from_tensor_slices((theta_placeholder, prj_placeholder)).shard(hvd.size(), hvd.rank()).batch(minibatch_size)
-        prj_iter = prj_dataset.make_initializable_iterator()
-        this_theta_batch, this_prj_batch = prj_iter.get_next()
+        # Placeholders take data for the current rank only. This is different from the fullfield case.
+        theta_placeholder = tf.placeholder(theta.dtype, minibatch_size)
+        # 3D array of shape [i_spot, pattern_y, pattern_x].
+        prj_placeholder = tf.placeholder(prj.dtype, [minibatch_size, *prj_shape[2:]])
+        pos_placeholder = tf.placeholder(probe_pos.dtype, [minibatch_size, 2])
+        # prj_dataset = tf.data.Dataset.from_tensor_slices(prj_placeholder)
+        # prj_iter = prj_dataset.make_initializable_iterator()
+        # this_prj_batch = prj_iter.get_next()
         print_flush('Dataset created in {} s.'.format(time.time() - t00))
         comm.Barrier()
 
@@ -411,16 +413,23 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
         n_loop = n_epochs if n_epochs != 'auto' else max_nepochs
         if ds_level == 1 and n_epoch_final_pass is not None:
             n_loop = n_epoch_final_pass
-        n_batch = int(np.ceil(float(n_theta) / minibatch_size / hvd.size()))
+        n_spots = n_theta * n_pos
+        n_tot_per_batch = minibatch_size * hvd.size()
+        n_batch = int(np.ceil(float(n_spots) / n_tot_per_batch))
         t00 = time.time()
 
         for epoch in range(n_loop):
 
-            n_tot_per_batch = minibatch_size * hvd.size()
-            ind_list_rand = np.arange(n_theta, dtype=int)
-            ind_list_rand = np.random.choice(ind_list_rand, n_theta, replace=False)
-            if n_theta % n_tot_per_batch != 0:
-                ind_list_rand = np.append(ind_list_rand, np.random.choice(ind_list_rand[:-(n_theta % n_tot_per_batch)], n_tot_per_batch - (n_theta % n_tot_per_batch), replace=False))
+            spots_ls = range(n_spots)
+            # This ensures that a minibatch that a rank gets will always be of the same theta.
+            ind_list_rand = []
+            for i_theta in np.random.choice(range(n_theta), n_theta, replace=False):
+                spots_ls = range(n_pos)
+                if n_theta % n_tot_per_batch != 0:
+                    spots_ls = np.append(spots_ls, np.random.choice(spots_ls[:-(n_spots % n_tot_per_batch)],
+                                                                    n_tot_per_batch - (n_spots % n_tot_per_batch),
+                                                                    replace=False))
+                ind_list_rand.append(np.vstack([np.array([i_theta] * len(spots_ls)), spots_ls]).transpose())
             ind_list_rand = split_tasks(ind_list_rand, n_tot_per_batch)
             ind_list_rand = [np.sort(x) for x in ind_list_rand]
 
@@ -434,22 +443,29 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
             if minibatch_size < n_theta:
                 batch_counter = 0
                 for i_batch in range(n_batch):
-                    this_theta_numpy = theta[ind_list_rand[i_batch]]
-                    this_prj_numpy = prj[list(prj_theta_ind[ind_list_rand[i_batch]])]
+                    # Pass theta and projections for the current rank only (no shard in placeholders).
+                    this_i_theta = ind_list_rand[i_batch][hvd.rank() * minibatch_size, 0]
+                    this_theta_numpy = theta[this_i_theta]
+                    this_prj_numpy = prj[this_i_theta, list(prj_theta_ind[ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]])]
+                    this_pos_batch = probe_pos[ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]]
                     if ds_level > 1:
                         this_prj_numpy = this_prj_numpy[:, :, ::ds_level, ::ds_level]
-                    sess.run(prj_iter.initializer, feed_dict={theta_placeholder: this_theta_numpy,
-                                                              prj_placeholder: this_prj_numpy})
                     if n_batch_per_update > 1:
                         t0_batch = time.time()
                         if probe_type == 'optimizable':
                             _, _, current_loss, current_reg, current_probe_reg, summary_str = sess.run(
-                                [accum_op, accum_op_probe, loss, reg_term, probe_reg, merged_summary_op], options=run_options,
-                                run_metadata=run_metadata)
+                                [accum_op, accum_op_probe, loss, reg_term, probe_reg, merged_summary_op],
+                                options=run_options, run_metadata=run_metadata,
+                                feed_dict={theta_placeholder: this_theta_numpy,
+                                           prj_placeholder: this_prj_numpy,
+                                           pos_placeholder: this_pos_batch})
                         else:
                             _, current_loss, current_reg, summary_str = sess.run(
-                                [accum_op, loss, reg_term, merged_summary_op], options=run_options,
-                                run_metadata=run_metadata)
+                                [accum_op, loss, reg_term, merged_summary_op],
+                                options=run_options, run_metadata=run_metadata,
+                                feed_dict={theta_placeholder: this_theta_numpy,
+                                           prj_placeholder: this_prj_numpy,
+                                           pos_placeholder: this_pos_batch})
                         print_flush('Minibatch done in {} s (rank {}); current loss = {}, probe reg. = {}.'.format(time.time() - t0_batch, hvd.rank(), current_loss, current_probe_reg))
                         batch_counter += 1
                         if batch_counter == n_batch_per_update or i_batch == n_batch - 1:
@@ -463,14 +479,22 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
                     else:
                         t0_batch = time.time()
                         if probe_type == 'optimizable':
-                            _, _, current_loss, current_reg, current_probe_reg, summary_str = sess.run([optimizer, optimizer_probe, loss, reg_term, probe_reg, merged_summary_op], options=run_options, run_metadata=run_metadata)
+                            _, _, current_loss, current_reg, current_probe_reg, summary_str = sess.run([optimizer, optimizer_probe, loss, reg_term, probe_reg, merged_summary_op],
+                                                                                                       options=run_options, run_metadata=run_metadata,
+                                                                                                       feed_dict={theta_placeholder: this_theta_numpy,
+                                                                                                                  prj_placeholder: this_prj_numpy,
+                                                                                                                  pos_placeholder: this_pos_batch})
                             print_flush(
                                 'Minibatch done in {} s (rank {}); current loss = {}, probe reg. = {}.'.format(
                                     time.time() - t0_batch, hvd.rank(), current_loss, current_probe_reg))
 
                         else:
                             ###
-                            _, current_loss, current_reg, summary_str = sess.run([optimizer, loss, reg_term, merged_summary_op], options=run_options, run_metadata=run_metadata)
+                            _, current_loss, current_reg, summary_str = sess.run([optimizer, loss, reg_term, merged_summary_op],
+                                                                                 options=run_options, run_metadata=run_metadata,
+                                                                                 feed_dict={theta_placeholder: this_theta_numpy,
+                                                                                            prj_placeholder: this_prj_numpy,
+                                                                                            pos_placeholder: this_pos_batch})
                             print_flush(
                                 'Minibatch done in {} s (rank {}); current loss = {}.'.format(
                                     time.time() - t0_batch, hvd.rank(), current_loss))
@@ -503,11 +527,19 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
 
             else:
                 if probe_type == 'optimizable':
-                    _, _, current_loss, current_reg, summary_str = sess.run([optimizer, optimizer_probe, loss, reg_term, merged_summary_op], options=run_options, run_metadata=run_metadata)
+                    _, _, current_loss, current_reg, summary_str = sess.run([optimizer, optimizer_probe, loss, reg_term, merged_summary_op],
+                                                                            options=run_options, run_metadata=run_metadata,
+                                                                            feed_dict={theta_placeholder: this_theta_numpy,
+                                                                                       prj_placeholder: this_prj_numpy,
+                                                                                       pos_placeholder: this_pos_batch})
                 else:
-                    _, current_loss, current_reg, summary_str = sess.run([optimizer, loss, reg_term, merged_summary_op], options=run_options, run_metadata=run_metadata)
+                    _, current_loss, current_reg, summary_str = sess.run([optimizer, loss, reg_term, merged_summary_op],
+                                                                         options=run_options, run_metadata=run_metadata,
+                                                                         feed_dict={theta_placeholder: this_theta_numpy,
+                                                                                    prj_placeholder: this_prj_numpy,
+                                                                                    pos_placeholder: this_pos_batch})
 
-            # timeline for benchmarking
+            # Timeline for benchmarking
             if hvd.rank() == 0:
                 tl = timeline.Timeline(run_metadata.step_stats)
                 ctf = tl.generate_chrome_trace_format()
