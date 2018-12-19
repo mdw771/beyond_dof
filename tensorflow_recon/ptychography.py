@@ -36,8 +36,12 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
     def rotate_and_project(i, obj):
 
         # obj_rot = apply_rotation(obj, coord_ls[rand_proj], 'arrsize_64_64_64_ntheta_500')
-        obj_rot = tf_rotate(obj, theta_placeholder[i], interpolation='BILINEAR')
-        probe_pos_batch_ls = pos_placeholder
+        obj_rot = tf_rotate(obj, theta_placeholder, interpolation='BILINEAR')
+        probe_pos_batch_ls = []
+        i_dp = 0
+        while i_dp < minibatch_size:
+            probe_pos_batch_ls.append(pos_placeholder[i_dp:min([i_dp + n_dp_batch, minibatch_size])])
+            i_dp += n_dp_batch
         exiting_ls = []
         # loss = tf.constant(0.0)
 
@@ -61,36 +65,38 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
             pad_arr[1, 1] = pad_len
 
         ind = 0
-        subobj_ls = []
-        for j in range(minibatch_size):
-            pos = pos_placeholder[j]
-            # ind = np.reshape([[x, y] for x in range(int(pos[0]) - probe_size_half[0], int(pos[0]) - probe_size_half[0] + probe_size[0])
-            #                   for y in range(int(pos[1]) - probe_size_half[1], int(pos[1]) - probe_size_half[1] + probe_size[1])],
-            #                  [probe_size[0], probe_size[1], 2])
-            # subobj = tf.gather_nd(obj_rot, ind)
-            pos[0] = pos[0] + pad_arr[0, 0]
-            pos[1] = pos[1] + pad_arr[1, 0]
-            subobj = obj_rot[pos[0] - probe_size_half[0]:pos[0] - probe_size_half[0] + probe_size[0],
-                             pos[1] - probe_size_half[1]:pos[1] - probe_size_half[1] + probe_size[1],
-                             :, :]
-            subobj_ls.append(subobj)
+        for k, pos_batch in enumerate(probe_pos_batch_ls):
+            subobj_ls = []
+            len_subobj = n_dp_batch if k < len(probe_pos_batch_ls) - 1 else minibatch_size % n_dp_batch
+            for j in range(len_subobj):
+                pos = pos_batch[j]
+                # ind = np.reshape([[x, y] for x in range(int(pos[0]) - probe_size_half[0], int(pos[0]) - probe_size_half[0] + probe_size[0])
+                #                   for y in range(int(pos[1]) - probe_size_half[1], int(pos[1]) - probe_size_half[1] + probe_size[1])],
+                #                  [probe_size[0], probe_size[1], 2])
+                # subobj = tf.gather_nd(obj_rot, ind)
+                pos_y = pos[0] + pad_arr[0, 0]
+                pos_x = pos[1] + pad_arr[1, 0]
+                subobj = obj_rot[pos_y - probe_size_half[0]:pos_y - probe_size_half[0] + probe_size[0],
+                                 pos_x - probe_size_half[1]:pos_x - probe_size_half[1] + probe_size[1],
+                                 :, :]
+                subobj_ls.append(subobj)
 
-        subobj_ls = tf.stack(subobj_ls)
-        if forward_algorithm == 'fresnel':
-            exiting = multislice_propagate_batch(subobj_ls[:, :, :, :, 0], subobj_ls[:, :, :, :, 1], probe_real, probe_imag,
-                                                 energy_ev, psize_cm * ds_level, h=h, free_prop_cm='inf',
-                                                 obj_batch_shape=[minibatch_size, *probe_size, obj_size[-1]])
-        elif forward_algorithm == 'fd':
-            exiting = multislice_propagate_fd(subobj_ls[:, :, :, :, 0], subobj_ls[:, :, :, :, 1], probe_real, probe_imag,
-                                              energy_ev, psize_cm * ds_level, h=h, free_prop_cm='inf',
-                                              obj_batch_shape=[minibatch_size, *probe_size, obj_size[-1]])
+            subobj_ls = tf.stack(subobj_ls)
+            if forward_algorithm == 'fresnel':
+                exiting = multislice_propagate_batch(subobj_ls[:, :, :, :, 0], subobj_ls[:, :, :, :, 1], probe_real, probe_imag,
+                                                     energy_ev, psize_cm * ds_level, h=h, free_prop_cm='inf',
+                                                     obj_batch_shape=[len_subobj, *probe_size, obj_size[-1]])
+            elif forward_algorithm == 'fd':
+                exiting = multislice_propagate_fd(subobj_ls[:, :, :, :, 0], subobj_ls[:, :, :, :, 1], probe_real, probe_imag,
+                                                  energy_ev, psize_cm * ds_level, h=h, free_prop_cm='inf',
+                                                  obj_batch_shape=[len_subobj, *probe_size, obj_size[-1]])
         # loss += tf.reduce_mean(tf.squared_difference(tf.abs(exiting), tf.abs(this_prj_batch[i][ind:ind+len(pos_batch)]))) * n_pos
         # ind += len(pos_batch)
-        # exiting_ls.append(exiting)
-        # exiting_ls = tf.concat(exiting_ls, 0)
+            exiting_ls.append(exiting)
+        exiting_ls = tf.concat(exiting_ls, 0)
         if probe_circ_mask is not None:
             exiting_ls = exiting_ls * probe_mask
-        loss = tf.reduce_mean(tf.squared_difference(tf.abs(exiting), tf.abs(prj_placeholder))) * minibatch_size
+        loss = tf.reduce_mean(tf.squared_difference(tf.abs(exiting_ls), tf.abs(prj_placeholder))) * minibatch_size
         loss = tf.identity(loss, name='loss')
 
         return loss
@@ -195,7 +201,7 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
         # prj_iter = prj_dataset.make_one_shot_iterator()
         # this_theta_batch, this_prj_batch = prj_iter.get_next()
         # Placeholders take data for the current rank only. This is different from the fullfield case.
-        theta_placeholder = tf.placeholder(theta.dtype, minibatch_size)
+        theta_placeholder = tf.placeholder(theta.dtype, ())
         # 3D array of shape [i_spot, pattern_y, pattern_x].
         prj_placeholder = tf.placeholder(prj.dtype, [minibatch_size, *prj_shape[2:]])
         pos_placeholder = tf.placeholder(probe_pos.dtype, [minibatch_size, 2])
@@ -311,9 +317,8 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
             # c = lambda i, loss, obj: tf.less(i, minibatch_size)
             # _, loss, _ = tf.while_loop(c, rotate_and_project, [i, loss, obj])
         # loss = rotate_and_project(j, obj)
-        loss = tf.constant(0.)
-        for j in range(0, minibatch_size):
-            loss += rotate_and_project(j, obj)
+        # loss = tf.constant(0.)
+        loss = rotate_and_project(0, obj)
         print_flush('Physical model built in {} s.'.format(time.time() - t00))
 
         # loss = loss / n_theta + alpha * tf.reduce_sum(tf.image.total_variation(obj))
@@ -361,8 +366,8 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
             # this_grad = optimizer.compute_gradients(loss, obj)
             # optimizer = optimizer.apply_gradients(this_grad)
 
-        if minibatch_size >= n_theta:
-            optimizer = optimizer.minimize(loss, var_list=[obj])
+        # if minibatch_size >= n_theta:
+        #     optimizer = optimizer.minimize(loss, var_list=[obj])
         # hooks = [hvd.BroadcastGlobalVariablesHook(0)]
         print_flush('Optimizer created in {} s.'.format(time.time() - t00))
 
@@ -423,15 +428,19 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
             spots_ls = range(n_spots)
             # This ensures that a minibatch that a rank gets will always be of the same theta.
             ind_list_rand = []
-            for i_theta in np.random.choice(range(n_theta), n_theta, replace=False):
+            print_flush('Allocating jobs over threads...')
+            for i, i_theta in enumerate(np.random.choice(range(n_theta), n_theta, replace=False)):
                 spots_ls = range(n_pos)
-                if n_theta % n_tot_per_batch != 0:
-                    spots_ls = np.append(spots_ls, np.random.choice(spots_ls[:-(n_spots % n_tot_per_batch)],
+                if n_spots % n_tot_per_batch != 0:
+                    spots_ls = np.append(spots_ls, np.random.choice(spots_ls[:-(n_pos % n_tot_per_batch)],
                                                                     n_tot_per_batch - (n_spots % n_tot_per_batch),
                                                                     replace=False))
-                ind_list_rand.append(np.vstack([np.array([i_theta] * len(spots_ls)), spots_ls]).transpose())
+                if i == 0:
+                    ind_list_rand = np.vstack([np.array([i_theta] * len(spots_ls)), spots_ls]).transpose()
+                else:
+                    ind_list_rand = np.concatenate([ind_list_rand, np.vstack([np.array([i_theta] * len(spots_ls)), spots_ls]).transpose()], axis=0)
             ind_list_rand = split_tasks(ind_list_rand, n_tot_per_batch)
-            ind_list_rand = [np.sort(x) for x in ind_list_rand]
+            ind_list_rand = [np.sort(x, axis=0) for x in ind_list_rand]
 
             if mpi4py_is_ok:
                 stop_iteration = False
@@ -446,7 +455,10 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
                     # Pass theta and projections for the current rank only (no shard in placeholders).
                     this_i_theta = ind_list_rand[i_batch][hvd.rank() * minibatch_size, 0]
                     this_theta_numpy = theta[this_i_theta]
-                    this_prj_numpy = prj[this_i_theta, list(prj_theta_ind[ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]])]
+                    # print(ind_list_rand)
+                    # print(prj_theta_ind[ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]])
+                    this_prj_numpy = prj[this_i_theta, ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]]
+                    print(ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1])
                     this_pos_batch = probe_pos[ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]]
                     if ds_level > 1:
                         this_prj_numpy = this_prj_numpy[:, :, ::ds_level, ::ds_level]

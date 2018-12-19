@@ -20,7 +20,7 @@ params_adhesin = {'fname': 'data_adhesin_64_1nm_1um.h5',
                   'center': 32,
                   'energy_ev': 800,
                   'psize_cm': 0.67e-7,
-                  'batch_size': 1,
+                  'batch_size': 529,
                   'n_batch_per_update': 1,
                   'output_folder': 'test',
                   'cpu_only': True,
@@ -146,7 +146,7 @@ params_cone = {'fname': 'data_cone_256_1nm_marc.h5',
                'finite_support_mask': dxchange.read_tiff('cone_256_filled_ptycho/mask.tiff')
                }
 
-params = params_cone_marc_noisy
+params = params_adhesin
 
 # init_delta = dxchange.read_tiff('cone_256_filled_ptycho/n100/iter5_cooley/delta_ds_1.tiff')
 # init_beta = dxchange.read_tiff('cone_256_filled_ptycho/n100/iter5_cooley/beta_ds_1.tiff')
