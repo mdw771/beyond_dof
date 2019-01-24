@@ -429,6 +429,7 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
             # This ensures that a minibatch that a rank gets will always be of the same theta.
             ind_list_rand = []
             print_flush('Allocating jobs over threads...')
+            # Make a list of all thetas and spot positions
             for i, i_theta in enumerate(np.random.choice(range(n_theta), n_theta, replace=False)):
                 spots_ls = range(n_pos)
                 if n_spots % n_tot_per_batch != 0:
