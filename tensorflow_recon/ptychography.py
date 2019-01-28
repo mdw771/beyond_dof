@@ -459,7 +459,7 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
                     # print(ind_list_rand)
                     # print(prj_theta_ind[ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]])
                     this_prj_numpy = prj[this_i_theta, ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]]
-                    print(ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1])
+                    # print(ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1])
                     this_pos_batch = probe_pos[ind_list_rand[i_batch][hvd.rank() * minibatch_size:(hvd.rank() + 1) * minibatch_size, 1]]
                     if ds_level > 1:
                         this_prj_numpy = this_prj_numpy[:, :, ::ds_level, ::ds_level]
