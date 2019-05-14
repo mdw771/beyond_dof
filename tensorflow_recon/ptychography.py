@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from util import *
 from misc import *
 plt.switch_backend('agg')
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 PI = 3.1415927
 

@@ -11,7 +11,7 @@ from util import *
 from misc import *
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
-
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 PI = 3.1415927
 
@@ -353,8 +353,8 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         # =============finite support===================
         obj_delta = obj_delta * mask
         obj_beta = obj_beta * mask
-        obj_delta = tf.nn.relu(obj_delta)
-        obj_beta = tf.nn.relu(obj_beta)
+        # obj_delta = tf.nn.relu(obj_delta)
+        # obj_beta = tf.nn.relu(obj_beta)
         # ==============================================
         # ================shrink wrap===================
         def shrink_wrap():
@@ -424,6 +424,9 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
             update_obj_delta = optimizer.apply_gradients([(accum_grad_delta / n_batch_per_update, this_grad_beta[1])])
             update_obj_beta = optimizer.apply_gradients([(accum_grad_beta / n_batch_per_update, this_grad_beta[1])])
         else:
+            ###
+            this_grad_delta = optimizer.compute_gradients(loss, obj_delta)
+            ###
             if object_type == 'normal':
                 optimizer = optimizer.minimize(loss)
             elif object_type == 'phase_only':
@@ -452,10 +455,10 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                 optimizer_probe = optimizer_probe.minimize(loss, var_list=[probe_real, probe_imag])
 
         # =============finite support===================
-        # obj_delta = obj_delta * mask
-        # obj_beta = obj_beta * mask
-        # obj_delta = tf.nn.relu(obj_delta)
-        # obj_beta = tf.nn.relu(obj_beta)
+        obj_delta = obj_delta * mask
+        obj_beta = obj_beta * mask
+        obj_delta = tf.nn.relu(obj_delta)
+        obj_beta = tf.nn.relu(obj_beta)
         # ==============================================
 
         loss_ls = []
@@ -531,11 +534,12 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                                     'Minibatch done in {} s (rank {}); current loss = {}, probe reg. = {}.'.format(
                                         time.time() - t0_batch, hvd.rank(), current_loss, current_probe_reg))
                             else:
-                                _, current_loss, current_reg, summary_str, mask_int, current_obj = sess.run([optimizer, loss, reg_term, merged_summary_op, mask, obj_delta], options=run_options, run_metadata=run_metadata)
+                                _, current_loss, current_reg, summary_str, mask_int, current_obj, current_grad = sess.run([optimizer, loss, reg_term, merged_summary_op, mask, obj_delta, this_grad_delta], options=run_options, run_metadata=run_metadata)
                                 print_flush(
                                     'Minibatch done in {} s (rank {}); current loss = {}; current reg = {}.'.format(
                                         time.time() - t0_batch, hvd.rank(), current_loss, current_reg))
-                                dxchange.write_tiff(current_obj, os.path.join(output_folder, 'intermediate_minibatch/delta'), dtype='float32')
+                                # dxchange.write_tiff(current_obj[int(105./256*current_obj.shape[0])], os.path.join(output_folder, 'intermediate_minibatch/delta'), dtype='float32')
+                                # dxchange.write_tiff(current_grad[0][0][int(105./256*current_obj.shape[0])], os.path.join(output_folder, 'intermediate_minibatch/grad'), dtype='float32')
                                 # dxchange.write_tiff(abs(mask_int), os.path.join(output_folder, 'masks', 'mask_{}'.format(epoch)), dtype='float32')
                                 # dxchange.write_tiff(exiting_wave, save_path + '/exit', dtype='float32')
                         # enforce pupil function
@@ -598,6 +602,12 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
             #             dxchange.write_tiff(np.squeeze(sess.run(mask)),
             #                                 os.path.join(save_path, 'fin_sup_mask/runtime_mask/epoch_{}'.format(epoch)), dtype='float32', overwrite=True)
             #     # ==============================================
+            # =============finite support===================
+            # obj_delta = obj_delta * mask
+            # obj_beta = obj_beta * mask
+            # obj_delta = tf.nn.relu(obj_delta)
+            # obj_beta = tf.nn.relu(obj_beta)
+            # ==============================================
             if hvd.rank() == 0:
                 loss_ls.append(current_loss)
                 reg_ls.append(current_reg)

@@ -12,11 +12,10 @@ src_fname = 'cone_256_foam_ptycho/data_cone_256_foam_1nm.h5'
 # src_fname = 'cell/ptychography/data_cell_phase.h5'
 # src_fname = 'cone_256_filled_ptycho/data_cone_256_1nm_marc.h5'
 # dest_fname = 'cone_256_filled_ptycho/data_cone_256_1nm_marc_n2e3_2.h5'
-n_ph_tx = '1e9'
+n_ph_tx = '1e7'
 n_sample_pixel = 28529
 n_ph = float(n_ph_tx) / n_sample_pixel
-print(n_ph)
-dest_fname = 'cone_256_foam_ptycho/data_cone_256_foam_1nm_n{}.h5'.format(n_ph_tx)
+dest_fname = 'cone_256_foam_ptycho/data_cone_256_foam_1nm_n{}_temp.h5'.format(n_ph_tx)
 # dest_fname = 'cell/ptychography/data_cell_phase_n{}_ref.h5'.format(n_ph_tx)
 # dest_fname = 'cell/ptychography/data_cell_phase_n4e8.h5'
 
@@ -42,6 +41,7 @@ if is_ptycho:
             prj_o_inten = np.abs(prj_o) ** 2
             # dc_intensity = prj_o_inten[int(o.shape[-2] / 2), int(o.shape[-1] / 2)]
             # prj_o_inten_norm = prj_o_inten / dc_intensity
+            print(n_ph)
             prj_o_inten_noisy = np.random.poisson(prj_o_inten * n_ph)
             prj_o_inten_noisy = prj_o_inten_noisy / n_ph
             noise = prj_o_inten_noisy - prj_o_inten
