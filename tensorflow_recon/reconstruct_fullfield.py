@@ -12,6 +12,9 @@ init_delta = np.load('2d_512/phantom/grid_delta.npy')
 init_beta = np.load('2d_512/phantom/grid_beta.npy')
 init = [init_delta, init_beta]
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+
 
 params_adhesin = {'fname': 'data_adhesin_360_soft.h5',
                   'theta_st': 0,
@@ -43,14 +46,14 @@ params_adhesin = {'fname': 'data_adhesin_360_soft.h5',
                   'forward_algorithm': 'fresnel',
                   'kwargs': {}}
 
-params_cone = {'fname': 'data_cone_256_1nm_1um_n1e7_ref.h5',
+params_cone = {'fname': 'data_cone_256_1nm_1um.h5',
                'theta_st': 0,
                'theta_end': 2 * np.pi,
                'n_epochs': 10,
-               'alpha_d': 1.5e-8,
+               'alpha_d': 1.5e-8 * 840,
                'alpha_b': 1.5e-9,
-               'gamma': 1e-11,
-               'learning_rate': 1e-7,
+               'gamma': 1e-11 * 840,
+               'learning_rate': 1e-7 * 840,
                'center': 128,
                'energy_ev': 5000,
                'psize_cm': 1.e-7,
@@ -59,12 +62,12 @@ params_cone = {'fname': 'data_cone_256_1nm_1um_n1e7_ref.h5',
                'theta_downsample': None,
                'n_epochs_mask_release': 10,
                'shrink_cycle': None,
-               'free_prop_cm': 1e-4,
+               'free_prop_cm': None,
                'n_batch_per_update': 1,
-               'output_folder': 'n1e7_ref',
+               'output_folder': None,
                'cpu_only': True,
-               'save_path': 'cone_256_foam',
-               'phantom_path': 'cone_256_foam/phantom',
+               'save_path': 'cone_256_foam_4pi',
+               'phantom_path': 'cone_256_foam_4pi/phantom',
                'multiscale_level': 3,
                'n_epoch_final_pass': 6,
                'save_intermediate': True,

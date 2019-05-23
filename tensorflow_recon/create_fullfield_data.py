@@ -53,9 +53,9 @@ params_cone = {'fname': 'data_cone_256_1nm_1um.h5',
                      'energy_ev': 5000,
                      'psize_cm': 1.e-7,
                      'batch_size': 1,
-                     'free_prop_cm': 1e-4,
-                     'save_folder': 'cone_256_foam',
-                     'phantom_path': 'cone_256_foam/phantom',
+                     'free_prop_cm': None,
+                     'save_folder': 'cone_256_foam_4pi',
+                     'phantom_path': 'cone_256_foam_4pi/phantom',
                      'probe_type': 'plane',
                      'dist_to_source_cm': None,
                      'det_psize_cm': None,
@@ -123,7 +123,7 @@ params_2d_cell = {'fname': 'data_cell_phase.h5',
                                        'probe_phase_max': 0.5},
                      }
 
-params = params_cone_180
+params = params_cone
 
 create_fullfield_data_numpy(energy_ev=params['energy_ev'],
                             psize_cm=params['psize_cm'],
