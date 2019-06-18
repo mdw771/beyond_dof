@@ -400,3 +400,16 @@ def apply_rotation(obj, coord_old, src_folder):
         obj_rot_channel_ls.append(np.reshape(obj_chan_new_val, s[:-1]))
     obj_rot = np.stack(obj_rot_channel_ls, axis=3)
     return obj_rot
+
+
+def create_probe_initial_guess(data_fname, dist_nm, energy_ev, psize_nm):
+
+    f = h5py.File(data_fname, 'r')
+    dat = f['exchange/data'][...]
+    # NOTE: this is for toy model
+    wavefront = np.mean(np.abs(dat), axis=0)
+    lmbda_nm = 1.24 / energy_ev
+    h = get_kernel(-dist_nm, lmbda_nm, [psize_nm, psize_nm], wavefront.shape)
+    wavefront = np.fft.fftshift(np.fft.fft2(wavefront)) * h
+    wavefront = np.fft.ifft2(np.fft.ifftshift(wavefront))
+    return wavefront
