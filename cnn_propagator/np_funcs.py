@@ -2,91 +2,67 @@ import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+import dxchange
+from pyfftw.interfaces.numpy_fft import fft2, ifft2, fftn, ifftn
+from pyfftw.interfaces.numpy_fft import fftshift as np_fftshift
+from pyfftw.interfaces.numpy_fft import ifftshift as np_ifftshift
 
-from util import *
+from util import get_kernel, get_kernel_ir
 
-
-
-def gen_mesh(max, shape):
-    """Generate mesh grid.
-    """
-    yy = np.linspace(-max[0], max[0], shape[0])
-    xx = np.linspace(-max[1], max[1], shape[1])
-    res = np.meshgrid(xx, yy)
-    return res
+PI = 3.1415927
 
 
-def get_kernel_ir(dist_nm, lmbda_nm, voxel_nm, shape):
+def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None):
 
-    k = 2 * np.pi / lmbda_nm
-    x, y = gen_mesh((np.array(shape) - 1.) / 2 * np.array(voxel_nm[:2]), shape)
-    kernel = np.exp(1j * np.pi * (x ** 2 + y ** 2) / (lmbda_nm * dist_nm))
-    return kernel
+    minibatch_size = obj_batch_shape[0]
+    grid_shape = obj_batch_shape[1:]
+    voxel_nm = np.array([psize_cm] * 3) * 1.e7
+    wavefront = np.zeros([minibatch_size, obj_batch_shape[1], obj_batch_shape[2]], dtype='complex64')
+    wavefront += (probe_real + 1j * probe_imag)
 
-
-def get_kernel_tf(dist_nm, lmbda_nm, voxel_nm, grid_shape):
-
-    k = 2 * np.pi / lmbda_nm
-    u_max = 1. / (2. * voxel_nm[0])
-    v_max = 1. / (2. * voxel_nm[1])
-    u, v = gen_mesh([v_max, u_max], grid_shape[0:2])
-    # H = np.exp(1j * k * dist_nm * np.sqrt(1 - lmbda_nm**2 * (u**2 + v**2)))
-    H = np.exp(1j * k * dist_nm) * np.exp(-1j * np.pi * lmbda_nm * dist_nm * (u ** 2 + v ** 2))
-
-    return H
-
-
-def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=256, free_prop_cm=None):
-
-    n_batch, shape_y, shape_x, n_slice = grid_delta.shape
     lmbda_nm = 1240. / energy_ev
-    voxel_nm = np.array(psize_cm) * 1.e7
+    mean_voxel_nm = np.prod(voxel_nm) ** (1. / 3)
+    size_nm = np.array(grid_shape) * voxel_nm
+
+    n_slice = obj_batch_shape[-1]
     delta_nm = voxel_nm[-1]
-    k = 2. * np.pi * delta_nm / lmbda_nm
 
-    kernel_complex = get_kernel_tf(delta_nm, lmbda_nm, voxel_nm, [kernel_size] * 2)
+    # h = get_kernel_ir(delta_nm, lmbda_nm, voxel_nm, grid_shape)
+    h = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape)
+    k = 2. * PI * delta_nm / lmbda_nm
 
-    kernel_complex = np.fft.ifft2(kernel_complex)
+    probe_array = []
 
-    probe_complex = probe_real + 1j * probe_imag
-    probe_complex = np.tile(probe_complex[np.newaxis, :, :], [n_batch, 1, 1])
+    for i in range(n_slice):
+        delta_slice = grid_delta_batch[:, :, :, i]
+        beta_slice = grid_beta_batch[:, :, :, i]
+        c = np.exp(1j * k * delta_slice) * np.exp(-k * beta_slice)
+        wavefront = wavefront * c
+        if i < n_slice - 1:
+            wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
+        probe_array.append(wavefront)
 
-    for i_slice in range(n_slice):
-        this_delta_batch = grid_delta[:, :, :, i_slice]
-        this_beta_batch = grid_beta[:, :, :, i_slice]
-        c = np.exp(1j * k * this_delta_batch - k * this_beta_batch)
-        probe_complex = probe_complex * c
+    if free_prop_cm is not None:
+        #1dxchange.write_tiff(abs(wavefront), '2d_1024/monitor_output/wv', dtype='float32', overwrite=True)
+        if free_prop_cm == 'inf':
+            wavefront = np_fftshift(fft2(wavefront), axes=[1, 2])
+        else:
+            dist_nm = free_prop_cm * 1e7
+            l = np.prod(size_nm)**(1. / 3)
+            crit_samp = lmbda_nm * dist_nm / l
+            algorithm = 'TF' if mean_voxel_nm > crit_samp else 'IR'
+            # print(algorithm)
+            algorithm = 'TF'
+            if algorithm == 'TF':
+                h = get_kernel(dist_nm, lmbda_nm, voxel_nm, grid_shape)
+                wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
+            else:
+                h = get_kernel_ir(dist_nm, lmbda_nm, voxel_nm, grid_shape)
+                wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
+            # dxchange.write_tiff(abs(wavefront), '2d_512/monitor_output/wv', dtype='float32', overwrite=True)
+            # dxchange.write_tiff(np.angle(h), '2d_512/monitor_output/h', dtype='float32', overwrite=True)
 
-        # probe_complex = np.fft.ifft2(np.fft.ifftshift(np.fft.fftshift(np.fft.fft2(probe_complex)) * kernel_complex))
-        probe_complex = scipy
-        # print(probe_complex)
-
-    return probe_complex
-
-    # for i_slice in range(n_slice):
-    #     this_delta_batch = grid_delta[:, :, :, i_slice]
-    #     this_beta_batch = grid_beta[:, :, :, i_slice]
-    #     c = np.exp(1j * k * this_delta_batch - k * this_beta_batch)
-    #     this_probe_complex = (np.cast(probe_real, np.complex128) + 1j * np.cast(probe_imag, np.complex128)) * c
-    #     probe_real, probe_imag = (np.real(this_probe_complex), np.imag(this_probe_complex))
-    #
-    #     wavefield_array = np.expand_dims(np.concat([probe_real, probe_imag], axis=0), -1)
-    #     # print(wavefield_array)
-    #     this_probe_complex = np.nn.conv2d(wavefield_array, kernel, (1, 1, 1, 1), 'SAME')
-    #     ac = this_probe_complex[0:n_batch, :, :, 0]
-    #     ad = this_probe_complex[0:n_batch, :, :, 1]
-    #     bc = this_probe_complex[n_batch:, :, :, 0]
-    #     bd = this_probe_complex[n_batch, :, :, 1]
-    #     probe_real = ac - bd
-    #     probe_imag = ad + bc
-    #
-    #     this_wavefield = np.exp(1j * np.cast(np.math.atan(probe_imag / probe_real), dtype=np.complex128))
-    #     probe_real = np.real(this_wavefield)
-    #     probe_imag = np.imag(this_wavefield)
-    #
-    #     print(this_wavefield)
-    #
-    # return np.cast(probe_real, np.complex128) + 1j *  np.cast(probe_imag, np.complex128)
+    return wavefront, np.array(probe_array)
 
 
 if __name__ == '__main__':
@@ -99,8 +75,6 @@ if __name__ == '__main__':
     probe_real = np.ones([*grid_delta.shape[1:3]])
     probe_imag = np.zeros([*grid_delta.shape[1:3]])
 
-    wavefield = multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, 5000, [1e-7, 1e-7, 1e-7])
-    print(wavefield.shape)
-    plt.imshow(abs(wavefield)[0])
-    plt.show()
+    wavefield, probe_array = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, 5000, 1e-7, obj_batch_shape=grid_delta.shape)
+    dxchange.write_tiff(np.abs(probe_array), 'test/np_array', overwrite=True, dtype='float32')
 
