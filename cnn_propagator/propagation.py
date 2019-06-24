@@ -60,12 +60,17 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         c = np.exp(1j * k * this_delta_batch - k * this_beta_batch)
         probe = probe * c
         # print(probe.shape, kernel.shape)
-        # probe = scipy.signal.convolve2d(probe, kernel, mode='valid', boundary='wrap')
+        # probe = scipy.signal.convolve2d(np.squeeze(probe), kernel, mode='same', boundary='wrap', fillvalue=1)
+        # probe = np.reshape(probe, [1, probe.shape[0], probe.shape[1]])
         probe = convolve(probe, kernel, mode='valid', axes=([1, 2], [0, 1]))
         # print(probe.shape)
         # probe = ifft2(np_ifftshift(np_fftshift(fft2(probe)) * np_fftshift(fft2(kernel))))
         # probe = ifft2(np_ifftshift(np_fftshift(fft2(probe)) * kernel))
-        probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='constant', constant_values=1)
+        probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='constant', constant_values=0.9998)
+
+        # re-normalize to 1
+        # probe *= 1. / np.mean(np.abs(probe))
+
         probe_array.append(np.abs(probe))
 
     if free_prop_cm is not None:
@@ -97,6 +102,8 @@ if __name__ == '__main__':
 
     import pandas
 
+    # grid_delta = np.load('adhesin/phantom/grid_delta.npy')
+    # grid_beta = np.load('adhesin/phantom/grid_beta.npy')
     grid_delta = np.load('cone_256_foam/phantom/grid_delta.npy')
     grid_beta = np.load('cone_256_foam/phantom/grid_beta.npy')
     grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
@@ -109,7 +116,7 @@ if __name__ == '__main__':
     # f.write('kernel_size,time\n')
 
     wavefield, probe_array, t = multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, 5000,
-                                                         [1e-7, 1e-7, 1e-7], kernel_size=17, free_prop_cm=1e-4, debug=True)
+                                                         [1e-7] * 3, kernel_size=17, free_prop_cm=None, debug=True)
 
     dxchange.write_tiff(np.array(probe_array), 'test/array_conv', dtype='float32', overwrite=True)
     dxchange.write_tiff(np.abs(wavefield), 'test/det', dtype='float32', overwrite=True)
