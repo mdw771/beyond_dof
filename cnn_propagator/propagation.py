@@ -2,11 +2,11 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import dxchange
-import autograd.numpy as np
-import autograd.numpy.random as npr
-import autograd.scipy.signal
-from autograd import grad
-convolve = autograd.scipy.signal.convolve
+import jax.numpy as np
+import jax.numpy.random as npr
+import jax.scipy.signal
+from jax import grad
+convolve = jax.scipy.signal.convolve
 import scipy.signal
 import time
 
