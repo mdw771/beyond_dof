@@ -4,10 +4,9 @@ import matplotlib.pyplot as plt
 import dxchange
 import autograd.numpy as np
 import autograd.numpy.random as npr
-import autograd.scipy.signal
+import autograd.scipy
+from autograd.scipy.signal import convolve
 from autograd import grad
-convolve = autograd.scipy.signal.convolve
-import scipy.signal
 import time
 
 from util import *
@@ -62,11 +61,11 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         # print(probe.shape, kernel.shape)
         # probe = scipy.signal.convolve2d(np.squeeze(probe), kernel, mode='same', boundary='wrap', fillvalue=1)
         # probe = np.reshape(probe, [1, probe.shape[0], probe.shape[1]])
+        probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='wrap')
         probe = convolve(probe, kernel, mode='valid', axes=([1, 2], [0, 1]))
         # print(probe.shape)
         # probe = ifft2(np_ifftshift(np_fftshift(fft2(probe)) * np_fftshift(fft2(kernel))))
         # probe = ifft2(np_ifftshift(np_fftshift(fft2(probe)) * kernel))
-        probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='constant', constant_values=0.9998)
 
         # re-normalize to 1
         # probe *= 1. / np.mean(np.abs(probe))
@@ -99,8 +98,6 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
 
 
 if __name__ == '__main__':
-
-    import pandas
 
     # grid_delta = np.load('adhesin/phantom/grid_delta.npy')
     # grid_beta = np.load('adhesin/phantom/grid_beta.npy')

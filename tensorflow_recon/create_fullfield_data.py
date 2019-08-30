@@ -123,7 +123,7 @@ params_2d_cell = {'fname': 'data_cell_phase.h5',
                                        'probe_phase_max': 0.5},
                      }
 
-params = params_cone
+params = params_2d_cell
 
 create_fullfield_data_numpy(energy_ev=params['energy_ev'],
                             psize_cm=params['psize_cm'],

@@ -24,7 +24,7 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
                              multiscale_level=1, n_epoch_final_pass=None, initial_guess=None, n_batch_per_update=1,
                              dynamic_rate=True, probe_type='gaussian', probe_initial=None, probe_learning_rate=1e-3,
                              pupil_function=None, probe_circ_mask=0.9, finite_support_mask=None, forward_algorithm='fresnel',
-                             n_dp_batch=20, object_type='normal', **kwargs):
+                             n_dp_batch=20, object_type='normal', poisson_multiplier=2e6, **kwargs):
 
     def split_tasks(arr, split_size):
         res = []
@@ -91,8 +91,8 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
         exiting_ls = tf.concat(exiting_ls, 0)
         if probe_circ_mask is not None:
             exiting_ls = exiting_ls * probe_mask
-        loss = tf.reduce_mean(tf.squared_difference(tf.abs(exiting_ls), tf.abs(this_prj_batch[i]))) * n_pos
-        loss = tf.identity(loss, name='loss')
+        # loss = tf.reduce_mean(tf.squared_difference(tf.abs(exiting_ls), tf.abs(this_prj_batch[i]))) * n_pos
+        loss = tf.reduce_mean(tf.abs(exiting_ls) ** 2 * poisson_multiplier - tf.abs(this_prj_batch[i]) ** 2 * poisson_multiplier * tf.log(tf.abs(exiting_ls) ** 2 * poisson_multiplier), name='loss')
 
         return loss
 
@@ -141,6 +141,7 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
     original_shape = [n_theta, *prj.shape[1:]]
     print_flush('Data reading: {} s'.format(time.time() - t0))
     print_flush('Data shape: {}'.format(original_shape))
+    print_flush('Poisson multiplier: {:e}.'.format(poisson_multiplier))
     comm.Barrier()
 
     initializer_flag = False
@@ -325,7 +326,7 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
             else:
                 reg_term = alpha_d * tf.norm(obj_delta, ord=1) + alpha_b * tf.norm(obj_beta, ord=1) + gamma * total_variation_3d(obj_delta)
 
-        loss = loss / n_theta / float(n_pos) + reg_term
+        loss = loss / n_theta + reg_term
         if probe_type == 'optimizable':
             probe_reg = 1.e-10 * (tf.image.total_variation(tf.reshape(probe_real, [dim_y, dim_x, -1])) +
                                    tf.image.total_variation(tf.reshape(probe_real, [dim_y, dim_x, -1])))
@@ -481,8 +482,8 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
                             ###
                             _, current_loss, current_reg, summary_str = sess.run([optimizer, loss, reg_term, merged_summary_op], options=run_options, run_metadata=run_metadata)
                             print_flush(
-                                'Minibatch done in {} s (rank {}); current loss = {}.'.format(
-                                    time.time() - t0_batch, hvd.rank(), current_loss))
+                                'Minibatch done in {} s (rank {}); current loss = {}; current reg = {}.'.format(
+                                    time.time() - t0_batch, hvd.rank(), current_loss, current_reg))
                             # pctx.profiler.profile_operations(options=opts)
                             ##############################
                             if hvd.rank() == 0:
