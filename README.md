@@ -1,4 +1,4 @@
-# Adorym (Automatic-Differentiation-based Object Retrieval using Dynamical Modeling)
+# Adorym (Automatic-Differentiation-based Object Retrieval using dYnamical Modeling)
 Optimization-based 3D reconstruction algorithm for objects beyond the depth-of-focus using Tensorflow as an iterative engine
 
 This code repo is used in the following publication(s):
