@@ -91,8 +91,8 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
         exiting_ls = tf.concat(exiting_ls, 0)
         if probe_circ_mask is not None:
             exiting_ls = exiting_ls * probe_mask
-        # loss = tf.reduce_mean(tf.squared_difference(tf.abs(exiting_ls), tf.abs(this_prj_batch[i]))) * n_pos
-        loss = tf.reduce_mean(tf.abs(exiting_ls) ** 2 * poisson_multiplier - tf.abs(this_prj_batch[i]) ** 2 * poisson_multiplier * tf.log(tf.abs(exiting_ls) ** 2 * poisson_multiplier), name='loss')
+        loss = tf.reduce_mean(tf.squared_difference(tf.abs(exiting_ls), tf.abs(this_prj_batch[i]))) * n_pos
+        # loss = tf.reduce_mean(tf.abs(exiting_ls) ** 2 * poisson_multiplier - tf.abs(this_prj_batch[i]) ** 2 * poisson_multiplier * tf.log(tf.abs(exiting_ls) ** 2 * poisson_multiplier), name='loss')
 
         return loss
 

@@ -8,12 +8,16 @@ import autograd.scipy
 from autograd.scipy.signal import convolve
 from autograd import grad
 import time
+import math
+import numpy as nnp
+from tqdm import trange
 
 from util import *
 
 
 def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, debug=False):
 
+    assert kernel_size % 2 == 1, 'kernel_size must be an odd number.'
     n_batch, shape_y, shape_x, n_slice = grid_delta.shape
     lmbda_nm = 1240. / energy_ev
     voxel_nm = np.array(psize_cm) * 1.e7
@@ -23,7 +27,7 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     size_nm = voxel_nm * grid_shape
     mean_voxel_nm = np.prod(voxel_nm) ** (1. / 3)
 
-    print('Critical distance is {} cm.'.format(psize_cm[0] * psize_cm[1] * grid_delta.shape[1] / (lmbda_nm * 1e-7)))
+    # print('Critical distance is {} cm.'.format(psize_cm[0] * psize_cm[1] * grid_delta.shape[1] / (lmbda_nm * 1e-7)))
 
     if kernel_size % 2 == 0:
         warnings.warn('Kernel size should be odd.')
@@ -42,16 +46,38 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     # kernel /= kernel.size
     pad_len = (kernel_size - 1) // 2
 
+    # probe_real = np.pad(probe_real, [[pad_len, pad_len], [pad_len, pad_len]], mode='constant', constant_values=1.0)
+    # probe_imag = np.pad(probe_real, [[pad_len, pad_len], [pad_len, pad_len]], mode='constant', constant_values=0)
     probe = probe_real + 1j * probe_imag
+    probe_size = probe.shape
     probe = np.tile(probe, [n_batch, 1, 1])
 
+    # grid_delta = np.pad(grid_delta, [[0, 0], [pad_len, pad_len], [pad_len, pad_len], [0, 0]], mode='constant', constant_values=0)
+    # grid_beta = np.pad(grid_beta, [[0, 0], [pad_len, pad_len], [pad_len, pad_len], [0, 0]], mode='constant', constant_values=0)
+
     probe_array = []
+
+    # Build cyclic convolution matrix for kernel
+    # kernel_mat = np.zeros([np.prod(probe_size)] * 2)
+    # kernel_full_00 = np.zeros(probe_size)
+    # kernel_full_00[:kernel_size, :kernel_size] = kernel
+    # kernel_full_00 = np.roll(kernel_full_00, -half_kernel_size, axis=0)
+    # kernel_full_00 = np.roll(kernel_full_00, -half_kernel_size, axis=1)
+    # kernel_mat[0, :] = kernel_full_00.flatten()
+    # for i in trange(probe_size[0]):
+    #     for j in range(probe_size[1]):
+    #         if i != 0 or j != 0:
+    #             kernel_temp = np.roll(kernel_full_00, i, axis=0)
+    #             kernel_temp = np.roll(kernel_temp, j, axis=1)
+    #             kernel_mat[i * probe_size[1] + j, :] = kernel_temp.flatten()
 
 
     t0 = time.time()
 
-    for i_slice in range(n_slice):
-        print(i_slice)
+    edge_val = 1.0
+
+    initial_int = probe[0, 0, 0]
+    for i_slice in trange(n_slice):
         this_delta_batch = grid_delta[:, :, :, i_slice]
         this_beta_batch = grid_beta[:, :, :, i_slice]
         # this_delta_batch = np.squeeze(this_delta_batch)
@@ -61,8 +87,16 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         # print(probe.shape, kernel.shape)
         # probe = scipy.signal.convolve2d(np.squeeze(probe), kernel, mode='same', boundary='wrap', fillvalue=1)
         # probe = np.reshape(probe, [1, probe.shape[0], probe.shape[1]])
-        probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='wrap')
+
+        probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='constant', constant_values=edge_val)
+        # probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='wrap')
         probe = convolve(probe, kernel, mode='valid', axes=([1, 2], [0, 1]))
+
+        # probe = np.reshape(probe, [n_batch, np.prod(probe_size)])
+        # probe = probe.dot(kernel_mat.T)
+        # probe = np.reshape(probe, [n_batch, *probe_size])
+
+        edge_val = sum(kernel.flatten() * edge_val)
         # print(probe.shape)
         # probe = ifft2(np_ifftshift(np_fftshift(fft2(probe)) * np_fftshift(fft2(kernel))))
         # probe = ifft2(np_ifftshift(np_fftshift(fft2(probe)) * kernel))
@@ -71,6 +105,9 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         # probe *= 1. / np.mean(np.abs(probe))
 
         probe_array.append(np.abs(probe))
+
+    final_int = probe[0, 0, 0]
+    probe *= (initial_int / final_int)
 
     if free_prop_cm is not None:
         #1dxchange.write_tiff(abs(wavefront), '2d_1024/monitor_output/wv', dtype='float32', overwrite=True)
@@ -113,7 +150,7 @@ if __name__ == '__main__':
     # f.write('kernel_size,time\n')
 
     wavefield, probe_array, t = multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, 5000,
-                                                         [1e-7] * 3, kernel_size=17, free_prop_cm=None, debug=True)
+                                                         [1e-7] * 3, kernel_size=17, free_prop_cm=1e-4, debug=True)
 
     dxchange.write_tiff(np.array(probe_array), 'test/array_conv', dtype='float32', overwrite=True)
     dxchange.write_tiff(np.abs(wavefield), 'test/det', dtype='float32', overwrite=True)
