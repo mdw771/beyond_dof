@@ -138,7 +138,9 @@ if __name__ == '__main__':
 
     # grid_delta = np.load('adhesin/phantom/grid_delta.npy')
     # grid_beta = np.load('adhesin/phantom/grid_beta.npy')
-    grid_delta = np.load('cone_256_foam/phantom/grid_delta.npy')
+    # grid_delta = np.load('cone_256_foam/phantom/grid_delta.npy')
+    # grid_beta = np.load('cone_256_foam/phantom/grid_beta.npy')
+    grid_delta = dxchange.read_tiff('cone_256_foam/test0/intermediate/current.tiff')
     grid_beta = np.load('cone_256_foam/phantom/grid_beta.npy')
     grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
     grid_beta = np.reshape(grid_beta, [1, *grid_beta.shape])
