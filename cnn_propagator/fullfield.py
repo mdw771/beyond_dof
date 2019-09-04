@@ -1,5 +1,5 @@
-import jax.numpy as np
-from jax import grad
+import autograd.numpy as np
+from autograd import grad
 # from mpi4py import MPI
 import dxchange
 import time
