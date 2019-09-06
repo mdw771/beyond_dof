@@ -102,15 +102,9 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         probe = probe * c
 
         # Distributed probe propagation
-        # temp_probe_full = np.zeros_like(probe)
+        temp_probe_full = np.zeros_like(probe)
         temp_probe_holder = np.zeros_like(probe)
-        temp_probe_ls = []
-        line_spacing = n_line_per_rank * (size - 1)
         line_ls = range(rank * n_line_per_rank, probe_size[0], n_line_per_rank * size)
-        n_lines = len(line_ls)
-
-        temp_probe_ls.append(np.zeros([n_batch, rank * n_line_per_rank, probe_size[1]]))
-
         for i, l in enumerate(line_ls):
             temp_probe = probe[:, max([0, l - pad_len]):min([l + n_line_per_rank + pad_len, probe_size[0]]), :]
             # Pad bottom if needed
@@ -122,29 +116,12 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
             # Pad left and right
             temp_probe = np.pad(temp_probe, [[0, 0], [0, 0], [pad_len, pad_len]], mode='constant', constant_values=edge_val)
             temp_probe = convolve(temp_probe, kernel, mode='valid', axes=([1, 2], [0, 1]))
-            # print(temp_probe)
-            # temp_probe_full[:, l:l + n_line_per_rank, :] = temp_probe
-            # Expand and append to line list
-            # if i == 0:
-            #     temp_probe = np.pad(temp_probe, [[0, 0], [rank * n_line_per_rank, line_spacing], [0, 0]],
-            #                         mode='constant', constant_values=0)
-            # elif i == n_lines - 1:
-            #     temp_probe = np.pad(temp_probe, [[0, 0], [0, probe_size[0] - (l + n_line_per_rank)], [0, 0]],
-            #                         mode='constant', constant_values=0)
-            # else:
-            #     temp_probe = np.pad(temp_probe, [[0, 0], [0, line_spacing], [0, 0]],
-            #                         mode='constant', constant_values=0)
-            temp_probe_ls.append(temp_probe)
-            if i < n_lines - 1:
-                temp_probe_ls.append(np.zeros([n_batch, line_spacing, probe_size[1]]))
-            else:
-                temp_probe_ls.append(np.zeros([n_batch, probe_size[0] - (l + n_line_per_rank), probe_size[1]]))
-        temp_probe_full = np.concatenate(temp_probe_ls, axis=1)
+            temp_probe_full[:, l:l + n_line_per_rank, :] = temp_probe
         comm.Barrier()
         t_comm_0 = time.time()
-        dxchange.write_tiff(abs(temp_probe_full), 'test/temp_probe_full/{}_{}'.format(i_slice, rank), dtype='float32', overwrite=True)
+        # dxchange.write_tiff(abs(temp_probe_full), 'test/temp_probe_full/{}_{}'.format(i_slice, rank), dtype='float32', overwrite=True)
         comm.Allreduce(temp_probe_full, temp_probe_holder)
-        dxchange.write_tiff(abs(temp_probe_holder), 'test/temp_probe_holder/{}_{}'.format(i_slice, rank), dtype='float32', overwrite=True)
+        # dxchange.write_tiff(abs(temp_probe_holder), 'test/temp_probe_holder/{}_{}'.format(i_slice, rank), dtype='float32', overwrite=True)
 
         t_comm += time.time() - t_comm_0
         probe = np.copy(temp_probe_holder)
