@@ -1,15 +1,17 @@
 import autograd.numpy as np
 from autograd import grad
-# from mpi4py import MPI
+from mpi4py import MPI
 import dxchange
+import matplotlib.pyplot as plt
+
 import time
 import os
 import h5py
 import warnings
+
 from util import *
 from misc import *
 from propagation import *
-import matplotlib.pyplot as plt
 
 plt.switch_backend('agg')
 
@@ -23,8 +25,8 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                           phantom_path='phantom', shrink_cycle=20, core_parallelization=True, free_prop_cm=None,
                           multiscale_level=1, n_epoch_final_pass=None, initial_guess=None, n_batch_per_update=5,
                           dynamic_rate=True, probe_type='plane', probe_initial=None, probe_learning_rate=1e-3,
-                          pupil_function=None, theta_downsample=None, forward_algorithm='fresnel', random_theta=True,
-                          object_type='normal', kernel_size=17, debug=False, **kwargs):
+                          pupil_function=None, theta_downsample=None, forward_algorithm='conv', random_theta=True,
+                          object_type='normal', debug=False, **kwargs):
     """
     Reconstruct a beyond depth-of-focus object.
     :param fname: Filename and path of raw data file. Must be in HDF5 format.
@@ -87,7 +89,7 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         exiting_batch = multislice_propagate_cnn(obj_rot_batch[:, :, :, :, 0], obj_rot_batch[:, :, :, :, 1],
                                                  probe_real, probe_imag, energy_ev,
                                                  [psize_cm * ds_level] * 3, free_prop_cm=free_prop_cm,
-                                                 kernel_size=kernel_size)
+                                                 kernel_size=kernel_size, n_line_per_rank=n_line_per_rank)
         return exiting_batch
 
     def calculate_loss(obj_delta, obj_beta, this_ind_batch, this_prj_batch):
@@ -102,7 +104,7 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         exiting_batch = multislice_propagate_cnn(obj_rot_batch[:, :, :, :, 0], obj_rot_batch[:, :, :, :, 1],
                                                  probe_real, probe_imag, energy_ev,
                                                  [psize_cm * ds_level] * 3, free_prop_cm=free_prop_cm,
-                                                 kernel_size=kernel_size)
+                                                 kernel_size=kernel_size, n_line_per_rank=n_line_per_rank)
         loss = np.mean((np.abs(exiting_batch) - np.abs(this_prj_batch)) ** 2)
 
 
@@ -147,6 +149,11 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         prj_theta_ind = prj_theta_ind[::theta_downsample]
         n_theta = len(theta)
     original_shape = prj_0.shape
+
+    if forward_algorithm == 'conv':
+        n_line_per_rank = kwargs['n_line_per_rank']
+        kernel_size = kwargs['kernel_size']
+
     comm.Barrier()
     print_flush('Data reading: {} s'.format(time.time() - t0), 0, rank)
     print_flush('Data shape: {}'.format(original_shape), 0, rank)
@@ -200,7 +207,6 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
             ind_ls = np.concatenate(ind_ls, ind_ls[:n_tot_per_batch - n_theta % n_tot_per_batch])
         ind_ls = split_tasks(ind_ls, n_tot_per_batch)
         ind_ls = [np.sort(x) for x in ind_ls]
-        print(len(ind_ls), n_theta % n_tot_per_batch)
 
         dim_y, dim_x = prj.shape[-2:]
         comm.Barrier()

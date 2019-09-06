@@ -77,10 +77,11 @@ params_cone = {'fname': 'data_cone_256_1nm_1um.h5',
                'full_intermediate': True,
                'initial_guess': [dxchange.read_tiff('cone_256_foam/init_delta.tiff'), dxchange.read_tiff('cone_256_foam/init_beta.tiff')],
                'probe_type': 'plane',
-               'forward_algorithm': 'fresnel',
-               'kernel_size': 17,
                'debug': True,
-               'kwargs': {}}
+               'forward_algorithm': 'conv',
+               'kernel_size': 17,
+               'n_line_per_rank': 2,
+               }
 
 params_cone_4pi = {'fname': 'data_cone_256_1nm_1um.h5',
                'theta_st': 0,
