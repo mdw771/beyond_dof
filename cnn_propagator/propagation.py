@@ -13,12 +13,10 @@ import warnings
 import math
 import numpy as nnp
 from tqdm import trange
+import dill
+from math import ceil, floor
 
 from util import *
-
-
-warnings.catch_warnings()
-warnings.simplefilter('ignore')
 
 try:
     comm = MPI.COMM_WORLD
@@ -32,7 +30,8 @@ except:
     rank = 0
     mpi_ok = False
 
-def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, n_line_per_rank=2, debug=False):
+
+def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, debug=False, original_grid_shape=None):
 
     assert kernel_size % 2 == 1, 'kernel_size must be an odd number.'
     n_batch, shape_y, shape_x, n_slice = grid_delta.shape
@@ -40,7 +39,10 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     voxel_nm = np.array(psize_cm) * 1.e7
     delta_nm = voxel_nm[-1]
     k = 2. * np.pi * delta_nm / lmbda_nm
-    grid_shape = np.array(grid_delta.shape[1:])
+    if original_grid_shape is not None:
+        grid_shape = np.array(original_grid_shape)
+    else:
+        grid_shape = np.array(grid_delta.shape[1:])
     size_nm = voxel_nm * grid_shape
     mean_voxel_nm = np.prod(voxel_nm) ** (1. / 3)
 
@@ -67,7 +69,6 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     probe_size = probe.shape
     probe = np.tile(probe, [n_batch, 1, 1])
 
-
     probe_array = []
 
     # Build cyclic convolution matrix for kernel
@@ -88,83 +89,24 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     t0 = time.time()
 
     edge_val = 1.0
-    kernel_sum = np.sum(kernel)
 
     initial_int = probe[0, 0, 0]
-    t00 = time.time()
-    t_comm = 0.
     for i_slice in trange(n_slice):
         this_delta_batch = grid_delta[:, :, :, i_slice]
         this_beta_batch = grid_beta[:, :, :, i_slice]
-
-        # Probe modulation
         c = np.exp(1j * k * this_delta_batch - k * this_beta_batch)
         probe = probe * c
-
-        # Distributed probe propagation
-        # temp_probe_full = np.zeros_like(probe)
-        temp_probe_holder = np.zeros_like(probe)
-        temp_probe_ls = []
-        line_spacing = n_line_per_rank * (size - 1)
-        line_ls = range(rank * n_line_per_rank, probe_size[0], n_line_per_rank * size)
-        n_lines = len(line_ls)
-
-        temp_probe_ls.append(np.zeros([n_batch, rank * n_line_per_rank, probe_size[1]]))
-
-        for i, l in enumerate(line_ls):
-            temp_probe = probe[:, max([0, l - pad_len]):min([l + n_line_per_rank + pad_len, probe_size[0]]), :]
-            # Pad bottom if needed
-            if l + n_line_per_rank + pad_len > probe_size[0]:
-                temp_probe = np.pad(temp_probe, [[0, 0], [0, l + n_line_per_rank + pad_len - probe_size[0]], [0, 0]], mode='constant', constant_values=edge_val)
-            # Pad top if needed
-            if l - pad_len < 0:
-                temp_probe = np.pad(temp_probe, [[0, 0], [pad_len - l, 0], [0, 0]], mode='constant', constant_values=edge_val)
-            # Pad left and right
-            temp_probe = np.pad(temp_probe, [[0, 0], [0, 0], [pad_len, pad_len]], mode='constant', constant_values=edge_val)
-            temp_probe = convolve(temp_probe, kernel, mode='valid', axes=([1, 2], [0, 1]))
-            # print(temp_probe)
-            # temp_probe_full[:, l:l + n_line_per_rank, :] = temp_probe
-            # Expand and append to line list
-            # if i == 0:
-            #     temp_probe = np.pad(temp_probe, [[0, 0], [rank * n_line_per_rank, line_spacing], [0, 0]],
-            #                         mode='constant', constant_values=0)
-            # elif i == n_lines - 1:
-            #     temp_probe = np.pad(temp_probe, [[0, 0], [0, probe_size[0] - (l + n_line_per_rank)], [0, 0]],
-            #                         mode='constant', constant_values=0)
-            # else:
-            #     temp_probe = np.pad(temp_probe, [[0, 0], [0, line_spacing], [0, 0]],
-            #                         mode='constant', constant_values=0)
-            temp_probe_ls.append(temp_probe)
-            if i < n_lines - 1:
-                temp_probe_ls.append(np.zeros([n_batch, line_spacing, probe_size[1]]))
-            else:
-                temp_probe_ls.append(np.zeros([n_batch, probe_size[0] - (l + n_line_per_rank), probe_size[1]]))
-        temp_probe_full = np.concatenate(temp_probe_ls, axis=1)
-        comm.Barrier()
-        t_comm_0 = time.time()
-        dxchange.write_tiff(abs(temp_probe_full), 'test/temp_probe_full/{}_{}'.format(i_slice, rank), dtype='float32', overwrite=True)
-        comm.Allreduce(temp_probe_full, temp_probe_holder)
-        dxchange.write_tiff(abs(temp_probe_holder), 'test/temp_probe_holder/{}_{}'.format(i_slice, rank), dtype='float32', overwrite=True)
-
-        t_comm += time.time() - t_comm_0
-        probe = np.copy(temp_probe_holder)
-
-        # probe = np.reshape(probe, [n_batch, np.prod(probe_size)])
-        # probe = probe.dot(kernel_mat.T)
-        # probe = np.reshape(probe, [n_batch, *probe_size])
-
-        edge_val *= kernel_sum
+        probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='constant', constant_values=edge_val)
+        probe = convolve(probe, kernel, mode='valid', axes=([1, 2], [0, 1]))
+        # Phase shift to incident wave induced by truncated kernel
+        edge_val = sum(kernel.flatten() * edge_val)
         probe_array.append(np.abs(probe))
 
-    if debug:
-        print_flush('Multislice time: {} s.'.format(time.time() - t00))
-        print_flush('Allreduce overhead: {} s.'.format(t_comm))
-
+    #  Correct intensity offset
     final_int = probe[0, 0, 0]
     probe *= (initial_int / final_int)
 
     if free_prop_cm is not None:
-        #1dxchange.write_tiff(abs(wavefront), '2d_1024/monitor_output/wv', dtype='float32', overwrite=True)
         if free_prop_cm == 'inf':
             probe = np.fft.fftshift(np.fft.fft2(probe), axes=[1, 2])
         else:
@@ -190,6 +132,11 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
 
 if __name__ == '__main__':
 
+    energy_ev = 5000
+    psize_cm = 1e-7
+    kernel_size = 17
+    free_prop_cm = None
+
     # grid_delta = np.load('adhesin/phantom/grid_delta.npy')
     # grid_beta = np.load('adhesin/phantom/grid_beta.npy')
     # grid_delta = np.load('cone_256_foam/phantom/grid_delta.npy')
@@ -198,6 +145,8 @@ if __name__ == '__main__':
     grid_beta = np.load('cone_256_foam/phantom/grid_beta.npy')
     grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
     grid_beta = np.reshape(grid_beta, [1, *grid_beta.shape])
+    n_batch = grid_delta.shape[0]
+    original_grid_shape = grid_delta.shape[1:]
 
     probe_real = np.ones([*grid_delta.shape[1:3]])
     probe_imag = np.zeros([*grid_delta.shape[1:3]])
@@ -205,11 +154,75 @@ if __name__ == '__main__':
     # f = open('test/conv_ir_report.csv', 'a')
     # f.write('kernel_size,time\n')
 
-    wavefield, probe_array, t = multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, 5000,
-                                                         [1e-7] * 3, kernel_size=17, free_prop_cm=1e-4, debug=True, n_line_per_rank=2)
+    lmbda_nm = 1.24 / (energy_ev / 1e3)
+    # safe_zone_width = ceil(np.sqrt((psize_cm * 1e-7 * grid_delta.shape[-1] + free_prop_cm * 1e-7) * lmbda_nm) / (psize_cm * 1e-7)) + (kernel_size // 2) + 1
+    safe_zone_width = 5
 
-    dxchange.write_tiff(np.array(probe_array), 'test/array_conv', dtype='float32', overwrite=True)
-    dxchange.write_tiff(np.abs(wavefield), 'test/det', dtype='float32', overwrite=True)
+    # Calculate the block range to be processed by each rank.
+    # If the number of ranks is smaller than the number of lines, each rank will take 1 or more
+    # whole lines.
+    n_lines = grid_delta.shape[1]
+    n_pixels_per_line = grid_delta.shape[2]
+    if size <= n_lines:
+        n_ranks_spill = n_lines % size
+        line_st = n_lines // size * rank + min([n_ranks_spill, rank])
+        line_end = line_st + n_lines // size
+        if rank < n_ranks_spill:
+            line_end += 1
+        px_st = 0
+        px_end = n_pixels_per_line
+        safe_zone_width_side = 0
+    else:
+        n_lines_spill = size % n_lines
+        n_ranks_per_line_base = size // n_lines
+        n_ranks_spill = n_lines_spill * (n_ranks_per_line_base + 1)
+        line_st = rank // (n_ranks_per_line_base + 1) if rank < n_ranks_spill else (rank - n_ranks_spill) // n_ranks_per_line_base + n_lines_spill
+        line_end = line_st + 1
+        n_ranks_per_line = n_ranks_per_line_base if line_st < n_lines_spill else n_ranks_per_line_base + 1
+        i_seg = rank % n_ranks_per_line
+        px_st = int(n_pixels_per_line * (float(i_seg) / n_ranks_per_line))
+        px_end = min([int(n_pixels_per_line * (float(i_seg + 1) / n_ranks_per_line)) + 1, n_pixels_per_line])
+        safe_zone_width_side = safe_zone_width
+
+    pad_len = 0
+    if line_st < safe_zone_width:
+        print(safe_zone_width, line_st)
+        grid_delta = np.pad(grid_delta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant', constant_values=0)
+        grid_beta = np.pad(grid_beta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant', constant_values=0)
+        probe_real = np.pad(probe_real, [[safe_zone_width, 0], [0, 0]], mode='edge')
+        probe_imag = np.pad(probe_imag, [[safe_zone_width, 0], [0, 0]], mode='edge')
+    if (n_lines - line_end + 1) < safe_zone_width:
+        grid_delta = np.pad(grid_delta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant', constant_values=0)
+        grid_beta = np.pad(grid_beta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant', constant_values=0)
+        probe_real = np.pad(probe_real, [[0, safe_zone_width], [0, 0]], mode='edge')
+        probe_imag = np.pad(probe_imag, [[0, safe_zone_width], [0, 0]], mode='edge')
+    if safe_zone_width_side > 0:
+        grid_delta = np.pad(grid_delta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]], mode='constant', constant_values=0)
+        grid_beta = np.pad(grid_beta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]], mode='constant', constant_values=0)
+        probe_real = np.pad(probe_real, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
+        probe_imag = np.pad(probe_imag, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
+
+    sub_grid_delta = grid_delta[:, line_st:line_end + 2 * safe_zone_width, px_st:px_end + 2 * safe_zone_width_side, :]
+    sub_grid_beta = grid_beta[:, line_st:line_end + 2 * safe_zone_width, px_st:px_end + 2 * safe_zone_width_side, :]
+    print(sub_grid_beta.shape)
+
+    t0 = time.time()
+    wavefield = multislice_propagate_cnn(sub_grid_beta, sub_grid_beta,
+                                         probe_real[line_st:line_end + 2 * safe_zone_width, px_st:px_end + 2 * safe_zone_width_side],
+                                         probe_imag[line_st:line_end + 2 * safe_zone_width, px_st:px_end + 2 * safe_zone_width_side],
+                                         energy_ev, [psize_cm] * 3, kernel_size=kernel_size, free_prop_cm=free_prop_cm, debug=False,
+                                         original_grid_shape=original_grid_shape)
+
+    this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')
+    this_full_wavefield[:, line_st:line_end, px_st:px_end] = wavefield[:, safe_zone_width:safe_zone_width + (line_end - line_st),
+                                                                    safe_zone_width_side:safe_zone_width_side + (px_end - px_st)]
+    full_wavefield = np.zeros_like(this_full_wavefield, dtype='complex64')
+    comm.Allreduce(this_full_wavefield, full_wavefield)
+    t = time.time() - t0
+
+    if rank == 0:
+        # dxchange.write_tiff(np.array(probe_array), 'test/array_conv', dtype='float32', overwrite=True)
+        dxchange.write_tiff(np.abs(full_wavefield), 'test/det', dtype='float32', overwrite=True)
 
 
     # for kernel_size in np.array([1, 2, 4, 8, 16, 32, 64, 128]) * 2 + 1:
@@ -221,6 +234,6 @@ if __name__ == '__main__':
     #     dxchange.write_tiff(np.array(probe_array), 'test/array_conv_{}_itf_bound_wrap'.format(kernel_size), dtype='float32', overwrite=True)
     #     f.write('{},{}\n'.format(kernel_size, t))
     # f.close()
-    # print('Delta t = {} s.'.format(t))
+    print('Delta t = {} s.'.format(t))
 
 

@@ -1,5 +1,5 @@
 from fullfield import reconstruct_fullfield
-import jax.numpy as np
+import autograd.numpy as np
 from constants import *
 import dxchange
 
@@ -14,8 +14,10 @@ import dxchange
 # init = [init_delta, init_beta]
 
 import os
+import warnings
 os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
+warnings.filterwarnings("ignore")
 
 params_adhesin = {'fname': 'data_adhesin_360_soft.h5',
                   'theta_st': 0,

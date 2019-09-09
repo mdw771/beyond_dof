@@ -1,4 +1,3 @@
-import tensorflow as tf
 import dxchange
 import h5py
 import matplotlib.pyplot as plt
@@ -268,8 +267,10 @@ def mag_phase_to_real_imag(mag, phase):
     return a.real, a.imag
 
 
-def split_tasks(arr, split_size):
+def split_tasks(arr, split_size=None, n_threads=None):
     res = []
+    if split_size is None:
+        split_size = int(np.ceil(len(arr) / n_threads))
     ind = 0
     while ind < len(arr):
         res.append(arr[ind:min(ind + split_size, len(arr))])
