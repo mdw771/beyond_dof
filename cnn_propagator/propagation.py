@@ -152,7 +152,7 @@ if __name__ == '__main__':
     # f.write('kernel_size,time\n')
 
     wavefield, probe_array, t = multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, 5000,
-                                                         [1e-7] * 3, kernel_size=17, free_prop_cm=1e-4, debug=True)
+                                                         [1e-7] * 3, kernel_size=17, free_prop_cm=None, debug=True)
 
     dxchange.write_tiff(np.array(probe_array), 'test/array_conv', dtype='float32', overwrite=True)
     dxchange.write_tiff(np.abs(wavefield), 'test/det', dtype='float32', overwrite=True)
