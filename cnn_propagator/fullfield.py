@@ -78,19 +78,19 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                               'fixed'.
     """
 
-    def forward_pass(obj_delta, obj_beta, this_ind_batch):
-        obj_stack = np.stack([obj_delta, obj_beta], axis=3)
-        obj_rot_batch = []
-        for i in range(minibatch_size):
-            obj_rot_batch.append(apply_rotation(obj_stack, coord_ls[this_ind_batch[i]],
-                                                'arrsize_{}_{}_{}_ntheta_{}'.format(dim_y, dim_x, dim_x, n_theta)))
-        obj_rot_batch = np.stack(obj_rot_batch)
-
-        exiting_batch = multislice_propagate_cnn(obj_rot_batch[:, :, :, :, 0], obj_rot_batch[:, :, :, :, 1],
-                                                 probe_real, probe_imag, energy_ev,
-                                                 [psize_cm * ds_level] * 3, free_prop_cm=free_prop_cm,
-                                                 kernel_size=kernel_size, n_line_per_rank=n_line_per_rank)
-        return exiting_batch
+    # def forward_pass(obj_delta, obj_beta, this_ind_batch):
+    #     obj_stack = np.stack([obj_delta, obj_beta], axis=3)
+    #     obj_rot_batch = []
+    #     for i in range(minibatch_size):
+    #         obj_rot_batch.append(apply_rotation(obj_stack, coord_ls[this_ind_batch[i]],
+    #                                             'arrsize_{}_{}_{}_ntheta_{}'.format(dim_y, dim_x, dim_x, n_theta)))
+    #     obj_rot_batch = np.stack(obj_rot_batch)
+    #
+    #     exiting_batch = multislice_propagate_cnn(obj_rot_batch[:, :, :, :, 0], obj_rot_batch[:, :, :, :, 1],
+    #                                              probe_real, probe_imag, energy_ev,
+    #                                              [psize_cm * ds_level] * 3, free_prop_cm=free_prop_cm,
+    #                                              kernel_size=kernel_size, n_line_per_rank=n_line_per_rank)
+    #     return exiting_batch
 
     def calculate_loss(obj_delta, obj_beta, this_ind_batch, this_prj_batch):
 
@@ -100,13 +100,85 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
             obj_rot_batch.append(apply_rotation(obj_stack, coord_ls[this_ind_batch[i]],
                                                 'arrsize_{}_{}_{}_ntheta_{}'.format(dim_y, dim_x, dim_x, n_theta)))
         obj_rot_batch = np.stack(obj_rot_batch)
+        original_grid_shape = obj_delta.shape
+        this_obj_delta = obj_rot_batch[:, :, :, :, 0]
+        this_obj_beta = obj_rot_batch[:, :, :, :, 1]
 
-        exiting_batch = multislice_propagate_cnn(obj_rot_batch[:, :, :, :, 0], obj_rot_batch[:, :, :, :, 1],
-                                                 probe_real, probe_imag, energy_ev,
-                                                 [psize_cm * ds_level] * 3, free_prop_cm=free_prop_cm,
-                                                 kernel_size=kernel_size, n_line_per_rank=n_line_per_rank)
-        loss = np.mean((np.abs(exiting_batch) - np.abs(this_prj_batch)) ** 2)
+        safe_zone_width = estimate_safe_zone_width(psize_cm * 1e7, this_obj_delta.shape[-1], energy_ev, 
+                                                   free_prop_cm=free_prop_cm, kernel_size=kernel_size, 
+                                                   fringe_spacing_coefficient=4.0)
+        print(safe_zone_width)
+        # Calculate the block range to be processed by each rank.
+        # If the number of ranks is smaller than the number of lines, each rank will take 1 or more
+        # whole lines.
+        n_lines = this_obj_delta.shape[1]
+        n_pixels_per_line = this_obj_delta.shape[2]
+        if size <= n_lines:
+            n_ranks_spill = n_lines % size
+            line_st = n_lines // size * rank + min([n_ranks_spill, rank])
+            line_end = line_st + n_lines // size
+            if rank < n_ranks_spill:
+                line_end += 1
+            px_st = 0
+            px_end = n_pixels_per_line
+            safe_zone_width_side = 0
+        else:
+            n_lines_spill = size % n_lines
+            n_ranks_per_line_base = size // n_lines
+            n_ranks_spill = n_lines_spill * (n_ranks_per_line_base + 1)
+            line_st = rank // (n_ranks_per_line_base + 1) if rank < n_ranks_spill else (rank - n_ranks_spill) // n_ranks_per_line_base + n_lines_spill
+            line_end = line_st + 1
+            n_ranks_per_line = n_ranks_per_line_base if line_st < n_lines_spill else n_ranks_per_line_base + 1
+            i_seg = rank % n_ranks_per_line
+            px_st = int(n_pixels_per_line * (float(i_seg) / n_ranks_per_line))
+            px_end = min([int(n_pixels_per_line * (float(i_seg + 1) / n_ranks_per_line)) + 1, n_pixels_per_line])
+            safe_zone_width_side = safe_zone_width
 
+        pad_top = 0
+        this_probe_real, this_probe_imag = (np.copy(probe_real), np.copy(probe_imag))
+        if line_st < safe_zone_width:
+            print(safe_zone_width, line_st)
+            this_obj_delta = np.pad(this_obj_delta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant',
+                                constant_values=0)
+            this_obj_beta = np.pad(this_obj_beta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant',
+                               constant_values=0)
+            this_probe_real = np.pad(this_probe_real, [[safe_zone_width, 0], [0, 0]], mode='edge')
+            this_probe_imag = np.pad(this_probe_imag, [[safe_zone_width, 0], [0, 0]], mode='edge')
+            pad_top = safe_zone_width
+        if (n_lines - line_end + 1) < safe_zone_width:
+            this_obj_delta = np.pad(this_obj_delta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant',
+                                constant_values=0)
+            this_obj_beta = np.pad(this_obj_beta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant',
+                               constant_values=0)
+            this_probe_real = np.pad(this_probe_real, [[0, safe_zone_width], [0, 0]], mode='edge')
+            this_probe_imag = np.pad(this_probe_imag, [[0, safe_zone_width], [0, 0]], mode='edge')
+        if safe_zone_width_side > 0:
+            this_obj_delta = np.pad(this_obj_delta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
+                                mode='constant', constant_values=0)
+            this_obj_beta = np.pad(this_obj_beta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
+                               mode='constant', constant_values=0)
+            this_probe_real = np.pad(this_probe_real, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
+            this_probe_imag = np.pad(this_probe_imag, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
+
+        sub_this_obj_delta = this_obj_delta[:, pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
+                         px_st:px_end + 2 * safe_zone_width_side, :]
+        sub_this_obj_beta = this_obj_beta[:, pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
+                        px_st:px_end + 2 * safe_zone_width_side, :]
+
+        exiting_batch = multislice_propagate_cnn(sub_this_obj_delta, sub_this_obj_beta,
+                                                 this_probe_real[
+                                                 pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
+                                                 px_st:px_end + 2 * safe_zone_width_side],
+                                                 this_probe_imag[
+                                                 pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
+                                                 px_st:px_end + 2 * safe_zone_width_side],
+                                                 energy_ev, [psize_cm] * 3, kernel_size=kernel_size,
+                                                 free_prop_cm=free_prop_cm, debug=False,
+                                                 original_grid_shape=original_grid_shape)
+        exiting_batch = exiting_batch[:, safe_zone_width:safe_zone_width + (line_end - line_st),
+                                      safe_zone_width_side:safe_zone_width_side + (px_end - px_st)]
+        this_sub_prj_batch = this_prj_batch[:, line_st:line_end, px_st:px_end]
+        loss = np.mean((np.abs(exiting_batch) - np.abs(this_sub_prj_batch)) ** 2)
 
         if alpha_d is None:
             reg_term = alpha * (np.sum(np.abs(obj_delta)) + np.sum(np.abs(obj_delta))) + gamma * total_variation_3d(
@@ -157,6 +229,11 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
     comm.Barrier()
     print_flush('Data reading: {} s'.format(time.time() - t0), 0, rank)
     print_flush('Data shape: {}'.format(original_shape), 0, rank)
+
+    # unify random seed for all threads
+    comm.Barrier()
+    seed = int(time.time() / 60)
+    np.random.seed(seed)
     comm.Barrier()
 
     initializer_flag = False
@@ -204,7 +281,8 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         np.random.shuffle(ind_ls)
         n_tot_per_batch = size * minibatch_size
         if n_theta % n_tot_per_batch > 0:
-            ind_ls = np.concatenate(ind_ls, ind_ls[:n_tot_per_batch - n_theta % n_tot_per_batch])
+            print(ind_ls[:n_tot_per_batch - n_theta % n_tot_per_batch])
+            ind_ls = np.append(ind_ls, ind_ls[:n_tot_per_batch - n_theta % n_tot_per_batch])
         ind_ls = split_tasks(ind_ls, n_tot_per_batch)
         ind_ls = [np.sort(x) for x in ind_ls]
 
@@ -243,12 +321,6 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         if ds_level > 1:
             mask = mask[::ds_level, ::ds_level, ::ds_level]
         dim_z = mask.shape[-1]
-
-        # unify random seed for all threads
-        comm.Barrier()
-        seed = int(time.time() / 60)
-        np.random.seed(seed)
-        comm.Barrier()
 
         if initializer_flag == False:
             if initial_guess is None:
@@ -375,9 +447,9 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
 
                 print_flush('Minibatch done in {} s (rank {})'.format(time.time() - t00, rank))
 
-                if i_batch % 10 == 0 and debug:
-                    temp_exit = forward_pass(obj_delta, obj_beta, this_ind_batch)
-                    dxchange.write_tiff(abs(temp_exit), os.path.join(output_folder, 'exits', '{}-{}'.format(i_epoch, i_batch)), dtype='float32', overwrite=True)
+                # if i_batch % 10 == 0 and debug:
+                #     temp_exit = forward_pass(obj_delta, obj_beta, this_ind_batch)
+                #     dxchange.write_tiff(abs(temp_exit), os.path.join(output_folder, 'exits', '{}-{}'.format(i_epoch, i_batch)), dtype='float32', overwrite=True)
 
             if n_epochs == 'auto':
                 pass

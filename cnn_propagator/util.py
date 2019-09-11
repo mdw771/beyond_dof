@@ -11,6 +11,8 @@ try:
     from scipy.ndimage import fourier_shift
 except:
     warnings.warn('Some dependencies are screwed up.')
+
+from math import ceil, floor, sqrt
 import os
 import pickle
 import glob
@@ -414,3 +416,9 @@ def create_probe_initial_guess(data_fname, dist_nm, energy_ev, psize_nm):
     wavefront = np.fft.fftshift(np.fft.fft2(wavefront)) * h
     wavefront = np.fft.ifft2(np.fft.ifftshift(wavefront))
     return wavefront
+
+
+def estimate_safe_zone_width(delta_nm, n_slices, energy_ev, free_prop_cm=0, kernel_size=17, fringe_spacing_coefficient=4.0):
+
+    lmbda_nm = 1240. / energy_ev
+    return ceil(fringe_spacing_coefficient * sqrt((delta_nm * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (delta_nm)) + (kernel_size // 2) + 1

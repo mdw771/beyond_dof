@@ -117,10 +117,10 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
             # print(algorithm)
             algorithm = 'TF'
             if algorithm == 'TF':
-                h = get_kernel(dist_nm, lmbda_nm, voxel_nm, grid_shape)
+                h = get_kernel(dist_nm, lmbda_nm, voxel_nm, np.array(grid_delta.shape[1:]))
                 probe = np.fft.ifft2(np.fft.ifftshift(np.fft.fftshift(np.fft.fft2(probe), axes=[1, 2]) * h, axes=[1, 2]))
             else:
-                h = get_kernel_ir(dist_nm, lmbda_nm, voxel_nm, grid_shape)
+                h = get_kernel_ir(dist_nm, lmbda_nm, voxel_nm, np.array(grid_delta.shape[1:]))
                 probe = np.fft.ifft2(np.fft.ifftshift(np.fft.fftshift(np.fft.fft2(probe), axes=[1, 2]) * h, axes=[1, 2]))
 
     if debug:
@@ -132,17 +132,24 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
 
 if __name__ == '__main__':
 
+    # f = open('test/safe_width_error.csv', 'w')
+    # f.write('safe_zone_width,error\n')
+    # ref = dxchange.read_tiff('test/det_std.tiff')
+
+    # for safe_zone_width in range(30, 130, 10):
+
+
     energy_ev = 5000
     psize_cm = 1e-7
     kernel_size = 17
-    free_prop_cm = None
+    free_prop_cm = 1e-4
 
     # grid_delta = np.load('adhesin/phantom/grid_delta.npy')
     # grid_beta = np.load('adhesin/phantom/grid_beta.npy')
-    # grid_delta = np.load('cone_256_foam/phantom/grid_delta.npy')
-    # grid_beta = np.load('cone_256_foam/phantom/grid_beta.npy')
-    grid_delta = dxchange.read_tiff('cone_256_foam/test0/intermediate/current.tiff')
+    grid_delta = np.load('cone_256_foam/phantom/grid_delta.npy')
     grid_beta = np.load('cone_256_foam/phantom/grid_beta.npy')
+    # grid_delta = dxchange.read_tiff('cone_256_foam/test0/intermediate/current.tiff')
+    # grid_beta = np.load('cone_256_foam/phantom/grid_beta.npy')
     grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
     grid_beta = np.reshape(grid_beta, [1, *grid_beta.shape])
     n_batch = grid_delta.shape[0]
@@ -155,8 +162,9 @@ if __name__ == '__main__':
     # f.write('kernel_size,time\n')
 
     lmbda_nm = 1.24 / (energy_ev / 1e3)
-    # safe_zone_width = ceil(np.sqrt((psize_cm * 1e-7 * grid_delta.shape[-1] + free_prop_cm * 1e-7) * lmbda_nm) / (psize_cm * 1e-7)) + (kernel_size // 2) + 1
-    safe_zone_width = 5
+    safe_zone_width = ceil(4.0 * np.sqrt((psize_cm * 1e7 * grid_delta.shape[-1] + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7)) + (kernel_size // 2) + 1
+    # safe_zone_width = 64
+    print(safe_zone_width)
 
     # Calculate the block range to be processed by each rank.
     # If the number of ranks is smaller than the number of lines, each rank will take 1 or more
@@ -184,38 +192,41 @@ if __name__ == '__main__':
         px_end = min([int(n_pixels_per_line * (float(i_seg + 1) / n_ranks_per_line)) + 1, n_pixels_per_line])
         safe_zone_width_side = safe_zone_width
 
-    pad_len = 0
+    pad_top, pad_bottom = (0, 0)
     if line_st < safe_zone_width:
         print(safe_zone_width, line_st)
         grid_delta = np.pad(grid_delta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant', constant_values=0)
         grid_beta = np.pad(grid_beta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant', constant_values=0)
         probe_real = np.pad(probe_real, [[safe_zone_width, 0], [0, 0]], mode='edge')
         probe_imag = np.pad(probe_imag, [[safe_zone_width, 0], [0, 0]], mode='edge')
+        pad_top = safe_zone_width
     if (n_lines - line_end + 1) < safe_zone_width:
         grid_delta = np.pad(grid_delta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant', constant_values=0)
         grid_beta = np.pad(grid_beta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant', constant_values=0)
         probe_real = np.pad(probe_real, [[0, safe_zone_width], [0, 0]], mode='edge')
         probe_imag = np.pad(probe_imag, [[0, safe_zone_width], [0, 0]], mode='edge')
+        pad_bottom = safe_zone_width
     if safe_zone_width_side > 0:
         grid_delta = np.pad(grid_delta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]], mode='constant', constant_values=0)
         grid_beta = np.pad(grid_beta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]], mode='constant', constant_values=0)
         probe_real = np.pad(probe_real, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
         probe_imag = np.pad(probe_imag, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
 
-    sub_grid_delta = grid_delta[:, line_st:line_end + 2 * safe_zone_width, px_st:px_end + 2 * safe_zone_width_side, :]
-    sub_grid_beta = grid_beta[:, line_st:line_end + 2 * safe_zone_width, px_st:px_end + 2 * safe_zone_width_side, :]
+    sub_grid_delta = grid_delta[:, pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width, px_st:px_end + 2 * safe_zone_width_side, :]
+    sub_grid_beta = grid_beta[:, pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width, px_st:px_end + 2 * safe_zone_width_side, :]
     print(sub_grid_beta.shape)
+    print(line_st, line_end)
 
     t0 = time.time()
-    wavefield = multislice_propagate_cnn(sub_grid_beta, sub_grid_beta,
-                                         probe_real[line_st:line_end + 2 * safe_zone_width, px_st:px_end + 2 * safe_zone_width_side],
-                                         probe_imag[line_st:line_end + 2 * safe_zone_width, px_st:px_end + 2 * safe_zone_width_side],
+    wavefield = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
+                                         probe_real[pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width, px_st:px_end + 2 * safe_zone_width_side],
+                                         probe_imag[pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width, px_st:px_end + 2 * safe_zone_width_side],
                                          energy_ev, [psize_cm] * 3, kernel_size=kernel_size, free_prop_cm=free_prop_cm, debug=False,
                                          original_grid_shape=original_grid_shape)
 
     this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')
     this_full_wavefield[:, line_st:line_end, px_st:px_end] = wavefield[:, safe_zone_width:safe_zone_width + (line_end - line_st),
-                                                                    safe_zone_width_side:safe_zone_width_side + (px_end - px_st)]
+                                                                       safe_zone_width_side:safe_zone_width_side + (px_end - px_st)]
     full_wavefield = np.zeros_like(this_full_wavefield, dtype='complex64')
     comm.Allreduce(this_full_wavefield, full_wavefield)
     t = time.time() - t0
@@ -236,4 +247,7 @@ if __name__ == '__main__':
     # f.close()
     print('Delta t = {} s.'.format(t))
 
-
+        # error = np.mean((abs(full_wavefield) - ref) ** 2)
+        # f.write('{},{}\n'.format(safe_zone_width, error))
+    #
+    # f.close()
