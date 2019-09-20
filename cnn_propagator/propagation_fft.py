@@ -30,7 +30,6 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
     delta_nm = voxel_nm[-1]
 
     # h = get_kernel_ir(delta_nm, lmbda_nm, voxel_nm, grid_shape)
-    print(grid_shape)
     h = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape)
     k = 2. * PI * delta_nm / lmbda_nm
 

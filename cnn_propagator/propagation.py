@@ -192,28 +192,30 @@ if __name__ == '__main__':
         px_end = min([int(n_pixels_per_line * (float(i_seg + 1) / n_ranks_per_line)) + 1, n_pixels_per_line])
         safe_zone_width_side = safe_zone_width
 
+    # sub_grids are memmaps
+    sub_grid_delta = grid_delta[:, max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, n_lines), max([0, px_st - safe_zone_width_side]):min([px_end + safe_zone_width_side, n_pixels_per_line]), :]
+    sub_grid_beta = grid_beta[:, max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, n_lines), max([0, px_st - safe_zone_width_side]):min([px_end + safe_zone_width_side, n_pixels_per_line]), :]
+
+    # During padding, sub_grids are read into the RAM
     pad_top, pad_bottom = (0, 0)
     if line_st < safe_zone_width:
-        print(safe_zone_width, line_st)
-        grid_delta = np.pad(grid_delta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant', constant_values=0)
-        grid_beta = np.pad(grid_beta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant', constant_values=0)
-        probe_real = np.pad(probe_real, [[safe_zone_width, 0], [0, 0]], mode='edge')
-        probe_imag = np.pad(probe_imag, [[safe_zone_width, 0], [0, 0]], mode='edge')
-        pad_top = safe_zone_width
+        sub_grid_delta = np.pad(sub_grid_delta, [[0, 0], [safe_zone_width - line_st, 0], [0, 0], [0, 0]], mode='constant', constant_values=0)
+        sub_grid_beta = np.pad(sub_grid_beta, [[0, 0], [safe_zone_width - line_st, 0], [0, 0], [0, 0]], mode='constant', constant_values=0)
+        probe_real = np.pad(probe_real, [[safe_zone_width - line_st, 0], [0, 0]], mode='edge')
+        probe_imag = np.pad(probe_imag, [[safe_zone_width - line_st, 0], [0, 0]], mode='edge')
+        pad_top = safe_zone_width - line_st
     if (n_lines - line_end + 1) < safe_zone_width:
-        grid_delta = np.pad(grid_delta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant', constant_values=0)
-        grid_beta = np.pad(grid_beta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant', constant_values=0)
-        probe_real = np.pad(probe_real, [[0, safe_zone_width], [0, 0]], mode='edge')
-        probe_imag = np.pad(probe_imag, [[0, safe_zone_width], [0, 0]], mode='edge')
+        sub_grid_delta = np.pad(sub_grid_delta, [[0, 0], [0, line_end + safe_zone_width - n_lines], [0, 0], [0, 0]], mode='constant', constant_values=0)
+        sub_grid_beta = np.pad(sub_grid_beta, [[0, 0], [0, line_end + safe_zone_width - n_lines], [0, 0], [0, 0]], mode='constant', constant_values=0)
+        probe_real = np.pad(probe_real, [[0, line_end + safe_zone_width - n_lines], [0, 0]], mode='edge')
+        probe_imag = np.pad(probe_imag, [[0, line_end + safe_zone_width - n_lines], [0, 0]], mode='edge')
         pad_bottom = safe_zone_width
     if safe_zone_width_side > 0:
-        grid_delta = np.pad(grid_delta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]], mode='constant', constant_values=0)
-        grid_beta = np.pad(grid_beta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]], mode='constant', constant_values=0)
+        sub_grid_delta = np.pad(sub_grid_delta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]], mode='constant', constant_values=0)
+        sub_grid_beta = np.pad(sub_grid_beta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]], mode='constant', constant_values=0)
         probe_real = np.pad(probe_real, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
         probe_imag = np.pad(probe_imag, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
 
-    sub_grid_delta = grid_delta[:, pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width, px_st:px_end + 2 * safe_zone_width_side, :]
-    sub_grid_beta = grid_beta[:, pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width, px_st:px_end + 2 * safe_zone_width_side, :]
     print(sub_grid_beta.shape)
     print(line_st, line_end)
 

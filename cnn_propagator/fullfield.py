@@ -26,7 +26,7 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                           multiscale_level=1, n_epoch_final_pass=None, initial_guess=None, n_batch_per_update=5,
                           dynamic_rate=True, probe_type='plane', probe_initial=None, probe_learning_rate=1e-3,
                           pupil_function=None, theta_downsample=None, forward_algorithm='conv', random_theta=True,
-                          object_type='normal', debug=False, **kwargs):
+                          object_type='normal', kernel_size=17, safe_zone_width='auto', debug=False, **kwargs):
     """
     Reconstruct a beyond depth-of-focus object.
     :param fname: Filename and path of raw data file. Must be in HDF5 format.
@@ -78,19 +78,6 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                               'fixed'.
     """
 
-    # def forward_pass(obj_delta, obj_beta, this_ind_batch):
-    #     obj_stack = np.stack([obj_delta, obj_beta], axis=3)
-    #     obj_rot_batch = []
-    #     for i in range(minibatch_size):
-    #         obj_rot_batch.append(apply_rotation(obj_stack, coord_ls[this_ind_batch[i]],
-    #                                             'arrsize_{}_{}_{}_ntheta_{}'.format(dim_y, dim_x, dim_x, n_theta)))
-    #     obj_rot_batch = np.stack(obj_rot_batch)
-    #
-    #     exiting_batch = multislice_propagate_cnn(obj_rot_batch[:, :, :, :, 0], obj_rot_batch[:, :, :, :, 1],
-    #                                              probe_real, probe_imag, energy_ev,
-    #                                              [psize_cm * ds_level] * 3, free_prop_cm=free_prop_cm,
-    #                                              kernel_size=kernel_size, n_line_per_rank=n_line_per_rank)
-    #     return exiting_batch
 
     def calculate_loss(obj_delta, obj_beta, this_ind_batch, this_prj_batch):
 
@@ -104,9 +91,6 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         this_obj_delta = obj_rot_batch[:, :, :, :, 0]
         this_obj_beta = obj_rot_batch[:, :, :, :, 1]
 
-        safe_zone_width = estimate_safe_zone_width(psize_cm * 1e7, this_obj_delta.shape[-1], energy_ev, 
-                                                   free_prop_cm=free_prop_cm, kernel_size=kernel_size, 
-                                                   fringe_spacing_coefficient=4.0)
         print(safe_zone_width)
         # Calculate the block range to be processed by each rank.
         # If the number of ranks is smaller than the number of lines, each rank will take 1 or more
@@ -134,36 +118,41 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
             px_end = min([int(n_pixels_per_line * (float(i_seg + 1) / n_ranks_per_line)) + 1, n_pixels_per_line])
             safe_zone_width_side = safe_zone_width
 
+        # sub_grids are memmaps
+        sub_this_obj_delta = this_obj_delta[:, max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, n_lines),
+                         max([0, px_st - safe_zone_width_side]):min([px_end + safe_zone_width_side, n_pixels_per_line]),
+                         :]
+        sub_this_obj_beta = this_obj_beta[:, max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, n_lines),
+                        max([0, px_st - safe_zone_width_side]):min([px_end + safe_zone_width_side, n_pixels_per_line]),
+                        :]
+
+        # During padding, sub_grids are read into the RAM 
         pad_top = 0
         this_probe_real, this_probe_imag = (np.copy(probe_real), np.copy(probe_imag))
         if line_st < safe_zone_width:
-            print(safe_zone_width, line_st)
-            this_obj_delta = np.pad(this_obj_delta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant',
-                                constant_values=0)
-            this_obj_beta = np.pad(this_obj_beta, [[0, 0], [safe_zone_width, 0], [0, 0], [0, 0]], mode='constant',
-                               constant_values=0)
-            this_probe_real = np.pad(this_probe_real, [[safe_zone_width, 0], [0, 0]], mode='edge')
-            this_probe_imag = np.pad(this_probe_imag, [[safe_zone_width, 0], [0, 0]], mode='edge')
-            pad_top = safe_zone_width
+            sub_this_obj_delta = np.pad(sub_this_obj_delta, [[0, 0], [safe_zone_width - line_st, 0], [0, 0], [0, 0]],
+                                    mode='constant', constant_values=0)
+            sub_this_obj_beta = np.pad(sub_this_obj_beta, [[0, 0], [safe_zone_width - line_st, 0], [0, 0], [0, 0]],
+                                   mode='constant', constant_values=0)
+            this_probe_real = np.pad(this_probe_real, [[safe_zone_width - line_st, 0], [0, 0]], mode='edge')
+            this_probe_imag = np.pad(this_probe_imag, [[safe_zone_width - line_st, 0], [0, 0]], mode='edge')
+            pad_top = safe_zone_width - line_st
         if (n_lines - line_end + 1) < safe_zone_width:
-            this_obj_delta = np.pad(this_obj_delta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant',
-                                constant_values=0)
-            this_obj_beta = np.pad(this_obj_beta, [[0, 0], [0, safe_zone_width], [0, 0], [0, 0]], mode='constant',
-                               constant_values=0)
-            this_probe_real = np.pad(this_probe_real, [[0, safe_zone_width], [0, 0]], mode='edge')
-            this_probe_imag = np.pad(this_probe_imag, [[0, safe_zone_width], [0, 0]], mode='edge')
+            sub_this_obj_delta = np.pad(sub_this_obj_delta, [[0, 0], [0, line_end + safe_zone_width - n_lines], [0, 0], [0, 0]],
+                                    mode='constant', constant_values=0)
+            sub_this_obj_beta = np.pad(sub_this_obj_beta, [[0, 0], [0, line_end + safe_zone_width - n_lines], [0, 0], [0, 0]],
+                                   mode='constant', constant_values=0)
+            this_probe_real = np.pad(this_probe_real, [[0, line_end + safe_zone_width - n_lines], [0, 0]], mode='edge')
+            this_probe_imag = np.pad(this_probe_imag, [[0, line_end + safe_zone_width - n_lines], [0, 0]], mode='edge')
         if safe_zone_width_side > 0:
-            this_obj_delta = np.pad(this_obj_delta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
-                                mode='constant', constant_values=0)
-            this_obj_beta = np.pad(this_obj_beta, [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
-                               mode='constant', constant_values=0)
+            sub_this_obj_delta = np.pad(sub_this_obj_delta,
+                                    [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
+                                    mode='constant', constant_values=0)
+            sub_this_obj_beta = np.pad(sub_this_obj_beta,
+                                   [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
+                                   mode='constant', constant_values=0)
             this_probe_real = np.pad(this_probe_real, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
             this_probe_imag = np.pad(this_probe_imag, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
-
-        sub_this_obj_delta = this_obj_delta[:, pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                         px_st:px_end + 2 * safe_zone_width_side, :]
-        sub_this_obj_beta = this_obj_beta[:, pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                        px_st:px_end + 2 * safe_zone_width_side, :]
 
         exiting_batch = multislice_propagate_cnn(sub_this_obj_delta, sub_this_obj_beta,
                                                  this_probe_real[
@@ -222,10 +211,6 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         n_theta = len(theta)
     original_shape = prj_0.shape
 
-    if forward_algorithm == 'conv':
-        n_line_per_rank = kwargs['n_line_per_rank']
-        kernel_size = kwargs['kernel_size']
-
     comm.Barrier()
     print_flush('Data reading: {} s'.format(time.time() - t0), 0, rank)
     print_flush('Data shape: {}'.format(original_shape), 0, rank)
@@ -281,8 +266,7 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         np.random.shuffle(ind_ls)
         n_tot_per_batch = size * minibatch_size
         if n_theta % n_tot_per_batch > 0:
-            print(ind_ls[:n_tot_per_batch - n_theta % n_tot_per_batch])
-            ind_ls = np.append(ind_ls, ind_ls[:n_tot_per_batch - n_theta % n_tot_per_batch])
+              ind_ls = np.append(ind_ls, ind_ls[:n_tot_per_batch - n_theta % n_tot_per_batch])
         ind_ls = split_tasks(ind_ls, n_tot_per_batch)
         ind_ls = [np.sort(x) for x in ind_ls]
 
@@ -404,11 +388,24 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
         delta_nm = voxel_nm[-1]
         h = get_kernel(delta_nm, lmbda_nm, voxel_nm, [dim_y, dim_y, dim_x])
 
+        # Get safe zone width if set to 'auto'
+        if safe_zone_width == 'auto':
+            safe_zone_width = estimate_safe_zone_width(psize_cm * 1e7, obj_delta.shape[-1], energy_ev,
+                                                       free_prop_cm=free_prop_cm, kernel_size=kernel_size,
+                                                       fringe_spacing_coefficient=4.0)
+
         loss_grad = grad(calculate_loss, [0, 1])
 
         print_flush('Optimizer started.', 0, rank)
         if rank == 0:
             create_summary(output_folder, locals(), preset='fullfield')
+
+        try:
+            os.makedirs(os.path.join(output_folder, 'convergence'))
+        except:
+            pass
+        f_loss = open(os.path.join(output_folder, 'convergence', 'loss.csv'), 'w')
+        f_loss.write('i_epoch,loss\n')
 
         cont = True
         i_epoch = 0
@@ -417,6 +414,7 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
             t0 = time.time()
             for i_batch in range(len(ind_ls)):
 
+                this_ind_batch = []
                 t00 = time.time()
                 this_ind_batch = ind_ls[i_batch][rank * minibatch_size:(rank + 1) * minibatch_size]
                 this_prj_batch = prj[this_ind_batch]
@@ -426,7 +424,7 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                 if mpi_ok:
                     grads = np.zeros_like(this_grads)
                     comm.Allreduce(this_grads, grads)
-                    grads = grads / size
+                    # grads = grads / size
                 (obj_delta, obj_beta), m, v = apply_gradient_adam(np.array([obj_delta, obj_beta]),
                                                                   grads, i_batch, m, v, step_size=learning_rate)
 
@@ -451,20 +449,25 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                 #     temp_exit = forward_pass(obj_delta, obj_beta, this_ind_batch)
                 #     dxchange.write_tiff(abs(temp_exit), os.path.join(output_folder, 'exits', '{}-{}'.format(i_epoch, i_batch)), dtype='float32', overwrite=True)
 
+            this_loss = calculate_loss(obj_delta, obj_beta, this_ind_batch, this_prj_batch)
+            current_loss = comm.allreduce(this_loss) / size
+
+            if rank == 0:
+                print_flush(
+                    'Epoch {} (rank {}); loss = {}; Delta-t = {} s; current time = {}.'.format(i_epoch, rank,
+                                                                        current_loss, time.time() - t0, time.time() - t_zero))
+                f_loss.write('{},{:e}\n'.format(i_epoch, current_loss))
+
             if n_epochs == 'auto':
                 pass
             else:
                 if i_epoch == n_epochs - 1: cont = False
             i_epoch = i_epoch + 1
-
-            print_flush(
-                'Epoch {} (rank {}); loss = {}; Delta-t = {} s; current time = {}.'.format(i_epoch, rank,
-                                                                    calculate_loss(obj_delta, obj_beta, this_ind_batch,
-                                                                                   this_prj_batch),
-                                                                    time.time() - t0, time.time() - t_zero))
         dxchange.write_tiff(obj_delta, fname=os.path.join(output_folder, 'delta_ds_{}'.format(ds_level)),
                             dtype='float32', overwrite=True)
         dxchange.write_tiff(obj_beta, fname=os.path.join(output_folder, 'beta_ds_{}'.format(ds_level)), dtype='float32',
                             overwrite=True)
 
         print_flush('Current iteration finished.', 0, rank)
+
+    f_loss.close()
