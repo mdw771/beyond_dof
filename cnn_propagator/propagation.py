@@ -1,6 +1,3 @@
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 from mpi4py import MPI
 import dxchange
 import autograd.numpy as np
@@ -13,7 +10,6 @@ import warnings
 import math
 import numpy as nnp
 from tqdm import trange
-import dill
 from math import ceil, floor
 
 from util import *

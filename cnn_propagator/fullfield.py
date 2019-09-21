@@ -2,7 +2,6 @@ import autograd.numpy as np
 from autograd import grad
 from mpi4py import MPI
 import dxchange
-import matplotlib.pyplot as plt
 
 import time
 import os
@@ -13,7 +12,6 @@ from util import *
 from misc import *
 from propagation import *
 
-plt.switch_backend('agg')
 
 PI = 3.1415927
 
