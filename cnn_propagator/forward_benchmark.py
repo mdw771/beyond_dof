@@ -69,7 +69,7 @@ for this_size in size_ls:
     comm.Allreduce(dt_ls, dt_ls_final)
 
     if rank == 0:
-        np.savetxt(os.path.join(path_prefix, 'phantom', 'size_{}', 'all_rank_timing.txt').format(this_size), dt_ls_final, delimiter=',')
+        np.savetxt(os.path.join(path_prefix, 'size_{}', 'all_rank_timing.txt').format(this_size), dt_ls_final, delimiter=',')
         dt_avg = np.mean(dt_ls_final)
         f.write('fft,{},0,0,{},0\n'.format(this_size, dt_avg))
         f.flush()
