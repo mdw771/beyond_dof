@@ -40,15 +40,6 @@ size_ls = np.array([256, 512, 1024, 2048, 4096])
 path_prefix = os.path.join(os.getcwd(), 'charcoal')
 n_repeats = 100
 
-# Start from where it stopped
-i_st = 0
-try:
-    f = open(os.path.join(path_prefix, 'size_{}'.format(size_ls[0]), 'timing.csv'), 'r')
-    a = f.readlines()[-1]
-    i_st = int(a[:a.find(',')])
-except:
-    pass
-
 # Create report
 if rank == 0:
     f = open(os.path.join(path_prefix, 'report.csv'), 'a')
@@ -56,7 +47,6 @@ if rank == 0:
 
 # Do a FFT based propagation
 for this_size in size_ls:
-    # f_temp = open(os.path.join(path_prefix, 'size_{}'.format(this_size), 'timing.csv'), 'a')
     grid_delta = dxchange.read_tiff(os.path.join(path_prefix, 'phantom', 'size_{}', 'grid_delta.tiff').format(this_size))
     grid_beta = dxchange.read_tiff(os.path.join(path_prefix, 'phantom', 'size_{}', 'grid_beta.tiff').format(this_size))
     grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
@@ -66,21 +56,21 @@ for this_size in size_ls:
     size_factor = size_ls[-1] // this_size
     psize_cm = psize_min_cm * size_factor
 
-    for i in trange(i_st, n_repeats):
-        t0 = time.time()
-        wavefield = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape)
-        dt = time.time() - t0
-        if i == 0:
-            dxchange.write_tiff(abs(wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output'), dtype='float32', overwrite=True)
-        # f_temp.write('{},{}\n'.format(i, dt))
-        # f_temp.flush()
-        # os.fsync(f_temp.fileno())
-    dt_avg = 0
+    dt_ls = np.zeros(size)
+    dt_ls_final = np.zeros(size)
+
+    t0 = time.time()
+    wavefield = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape)
+    dt = time.time() - t0
+    dt_ls[rank] = dt
+    dxchange.write_tiff(abs(wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output'), dtype='float32', overwrite=True)
+
     print('FFT (rank {}): For size {}, dt = {} s.'.format(rank, this_size, dt))
-    comm.Allreduce(dt, dt_avg)
-    dt_avg /= size
+    comm.Allreduce(dt_ls, dt_ls_final)
 
     if rank == 0:
+        np.savetxt(os.path.join(path_prefix, 'phantom', 'size_{}', 'all_rank_timing.txt').format(this_size), dt_ls_final, delimiter=',')
+        dt_avg = np.mean(dt_ls_final)
         f.write('fft,{},0,0,{},0\n'.format(this_size, dt_avg))
         f.flush()
         os.fsync(f.fileno())
