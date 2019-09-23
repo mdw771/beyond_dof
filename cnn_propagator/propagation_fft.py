@@ -1,7 +1,5 @@
-import tensorflow as tf
 import autograd.numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from autograd.numpy.fft import fft2, ifft2
 from autograd.numpy.fft import fftshift as np_fftshift
