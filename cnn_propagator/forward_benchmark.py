@@ -61,6 +61,8 @@ for this_size in size_ls:
     if this_size == 4096:
         is_large_array = True
         debug_save_path = os.path.join(path_prefix, 'size_{}', 'debug').format(this_size)
+        if not os.path.exists(debug_save_path):
+            os.makedirs(debug_save_path)
         if os.path.exists(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank))):
             i_st = int(np.loadtxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank))))
             probe_real = dxchange.read_tiff(os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)))
