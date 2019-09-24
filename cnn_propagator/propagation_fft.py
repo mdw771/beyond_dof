@@ -12,7 +12,7 @@ import time
 
 from util import *
 
-def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None):
+def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True):
 
     minibatch_size = obj_batch_shape[0]
     grid_shape = obj_batch_shape[1:]
@@ -31,13 +31,17 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
     h = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape)
     k = 2. * PI * delta_nm / lmbda_nm
 
+    t_tot = 0
+
     for i in range(n_slice):
         delta_slice = grid_delta_batch[:, :, :, i]
         beta_slice = grid_beta_batch[:, :, :, i]
+        t0 = time.time()
         c = np.exp(1j * k * delta_slice) * np.exp(-k * beta_slice)
         wavefront = wavefront * c
         if i < n_slice - 1:
             wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
+        t_tot += (time.time() - t0)
 
     if free_prop_cm is not None:
         dxchange.write_tiff(abs(wavefront), '2d_1024/monitor_output/wv', dtype='float32', overwrite=True)
@@ -58,8 +62,10 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
                 wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
             # dxchange.write_tiff(abs(wavefront), '2d_512/monitor_output/wv', dtype='float32', overwrite=True)
             # dxchange.write_tiff(np.angle(h), '2d_512/monitor_output/h', dtype='float32', overwrite=True)
-
-    return wavefront
+    if return_fft_time:
+        return wavefront, t_tot
+    else:
+        return wavefront
 
 
 if __name__ == '__main__':

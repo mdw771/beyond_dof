@@ -59,9 +59,9 @@ for this_size in size_ls:
     dt_ls = np.zeros(size)
     dt_ls_final = np.zeros(size)
 
-    t0 = time.time()
-    wavefield = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape)
-    dt = time.time() - t0
+    # t0 = time.time()
+    wavefield, dt = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape, return_fft_time=True)
+    # dt = time.time() - t0
     dt_ls[rank] = dt
     dxchange.write_tiff(abs(wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output'), dtype='float32', overwrite=True)
 
