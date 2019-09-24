@@ -38,8 +38,9 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
             np.savetxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank)), np.array([i]))
             dxchange.write_tiff(wavefront.real, os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
             dxchange.write_tiff(wavefront.imag, os.path.join(debug_save_path, 'probe_imag_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
-        delta_slice = grid_delta_batch[:, :, :, i]
-        beta_slice = grid_beta_batch[:, :, :, i]
+        # Use np.array to convert memmap to memory object
+        delta_slice = np.array(grid_delta_batch[:, :, :, i])
+        beta_slice = np.array(grid_beta_batch[:, :, :, i])
         t0 = time.time()
         c = np.exp(1j * k * delta_slice) * np.exp(-k * beta_slice)
         wavefront = wavefront * c
