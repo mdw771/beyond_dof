@@ -72,7 +72,7 @@ for this_size in size_ls:
     dt_ls_final = np.zeros(size)
 
     # t0 = time.time()
-    wavefield, dt = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape, return_fft_time=True, starting_slice=i_st, debug=debug_save_path)
+    wavefield, dt = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape, return_fft_time=True, starting_slice=i_st, debug=is_large_array, debug_save_path=debug_save_path)
     # dt = time.time() - t0
     dt_ls[rank] = dt
     dxchange.write_tiff(abs(wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output'), dtype='float32', overwrite=True)
