@@ -12,7 +12,7 @@ import time
 
 from util import *
 
-def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None):
+def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0):
 
     minibatch_size = obj_batch_shape[0]
     grid_shape = obj_batch_shape[1:]
@@ -35,9 +35,9 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
 
     for i in range(starting_slice, n_slice):
         if i % 5 == 0 and debug:
-            np.savetxt(os.path.join(debug_save_path, 'current_islice.txt'), np.array([i]))
-            dxchange.write_tiff(wavefront.real, os.path.join(debug_save_path, 'probe_real.tiff'), dtype='float32', overwrite=True)
-            dxchange.write_tiff(wavefront.imag, os.path.join(debug_save_path, 'probe_imag.tiff'), dtype='float32', overwrite=True)
+            np.savetxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank)), np.array([i]))
+            dxchange.write_tiff(wavefront.real, os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
+            dxchange.write_tiff(wavefront.imag, os.path.join(debug_save_path, 'probe_imag_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
         delta_slice = grid_delta_batch[:, :, :, i]
         beta_slice = grid_beta_batch[:, :, :, i]
         t0 = time.time()

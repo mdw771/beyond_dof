@@ -60,11 +60,11 @@ for this_size in size_ls:
     i_st = 0
     if this_size == 4096:
         is_large_array = True
-        debug_save_path = os.path.join(path_prefix, 'size_{}').format(this_size)
-        if os.path.exists(os.path.join(debug_save_path, 'current_islice.txt')):
-            i_st = int(np.loadtxt(os.path.join(debug_save_path, 'current_islice.txt')))
-            probe_real = dxchange.read_tiff(os.path.join(debug_save_path, 'probe_real.tiff'))
-            probe_imag = dxchange.read_tiff(os.path.join(debug_save_path, 'probe_imag.tiff'))
+        debug_save_path = os.path.join(path_prefix, 'size_{}', 'debug').format(this_size)
+        if os.path.exists(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank))):
+            i_st = int(np.loadtxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank))))
+            probe_real = dxchange.read_tiff(os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)))
+            probe_imag = dxchange.read_tiff(os.path.join(debug_save_path, 'probe_imag_rank_{}.tiff'.format(rank)))
     size_factor = size_ls[-1] // this_size
     psize_cm = psize_min_cm * size_factor
 
@@ -72,7 +72,7 @@ for this_size in size_ls:
     dt_ls_final = np.zeros(size)
 
     # t0 = time.time()
-    wavefield, dt = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape, return_fft_time=True, starting_slice=i_st, debug=is_large_array, debug_save_path=debug_save_path)
+    wavefield, dt = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape, return_fft_time=True, starting_slice=i_st, debug=is_large_array, debug_save_path=debug_save_path, rank=rank)
     # dt = time.time() - t0
     dt_ls[rank] = dt
     dxchange.write_tiff(abs(wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output'), dtype='float32', overwrite=True)
