@@ -18,7 +18,8 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
     minibatch_size = obj_batch_shape[0]
     grid_shape = obj_batch_shape[1:]
     voxel_nm = np.array(psize_cm) * 1.e7
-    wavefront = np.zeros([minibatch_size, obj_batch_shape[1], obj_batch_shape[2]], dtype='complex64')
+    if probe_real.ndim == 2:
+        wavefront = np.zeros([minibatch_size, obj_batch_shape[1], obj_batch_shape[2]], dtype='complex64')
     wavefront += (probe_real + 1j * probe_imag)
 
     lmbda_nm = 1240. / energy_ev
