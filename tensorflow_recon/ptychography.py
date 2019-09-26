@@ -113,8 +113,8 @@ def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0,
         except:
             warnings.warn('MPI multithreading is not supported.')
         try:
-            import mpi4py.rc
-            mpi4py.rc.initialize = False
+            # import mpi4py.rc
+            # mpi4py.rc.initialize = False
             from mpi4py import MPI
             comm = MPI.COMM_WORLD
             mpi4py_is_ok = True

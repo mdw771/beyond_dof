@@ -15,6 +15,10 @@ plt.switch_backend('agg')
 
 PI = 3.1415927
 
+# This one is distributed over ANGLES.
+# But of course there is only 1 angle.
+# So don't use multiple threads. Doesn't make sense.
+
 
 def reconstruct_ptychography(fname, probe_pos, probe_size, obj_size, theta_st=0, theta_end=PI, theta_downsample=None,
                              n_epochs='auto', crit_conv_rate=0.03, max_nepochs=200,

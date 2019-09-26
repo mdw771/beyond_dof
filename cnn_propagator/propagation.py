@@ -102,7 +102,7 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     final_int = probe[0, 0, 0]
     probe *= (initial_int / final_int)
 
-    if free_prop_cm is not None:
+    if free_prop_cm not in [None, 0]:
         if free_prop_cm == 'inf':
             probe = np.fft.fftshift(np.fft.fft2(probe), axes=[1, 2])
         else:

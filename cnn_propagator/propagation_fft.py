@@ -12,7 +12,7 @@ import time
 
 from util import *
 
-def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0):
+def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0):
 
     minibatch_size = obj_batch_shape[0]
     grid_shape = obj_batch_shape[1:]
@@ -31,11 +31,10 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
     h = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape)
     k = 2. * PI * delta_nm / lmbda_nm
 
-    t_tot = 0
-
+    t_tot = t_init
     for i in range(starting_slice, n_slice):
         if i % 5 == 0 and debug:
-            np.savetxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank)), np.array([i]))
+            np.savetxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank)), np.array([i, t_tot]))
             dxchange.write_tiff(wavefront.real, os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
             dxchange.write_tiff(wavefront.imag, os.path.join(debug_save_path, 'probe_imag_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
         # Use np.array to convert memmap to memory object
@@ -48,7 +47,7 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
             wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
         t_tot += (time.time() - t0)
 
-    if free_prop_cm is not None:
+    if free_prop_cm not in [0, None]:
         if free_prop_cm == 'inf':
             wavefront = np_fftshift(fft2(wavefront), axes=[1, 2])
         else:
