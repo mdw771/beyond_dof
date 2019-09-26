@@ -59,6 +59,7 @@ for this_size in size_ls:
     # Start from where it stopped
     i_st = 0
     t_init = 0
+    verbose = True if rank == 0 else False
     if this_size == 4096:
         is_large_array = True
         debug_save_path = os.path.join(path_prefix, 'size_{}', 'debug').format(this_size)
@@ -81,7 +82,7 @@ for this_size in size_ls:
     dt_ls_final = np.zeros(n_ranks)
 
     # t0 = time.time()
-    wavefield, dt = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape, return_fft_time=True, starting_slice=i_st, t_init=t_init, debug=is_large_array, debug_save_path=debug_save_path, rank=rank)
+    wavefield, dt = multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, [psize_cm] * 3, obj_batch_shape=grid_delta.shape, return_fft_time=True, starting_slice=i_st, t_init=t_init, debug=is_large_array, debug_save_path=debug_save_path, rank=rank, verbose=verbose)
     # dt = time.time() - t0
     dt_ls[rank] = dt
     dxchange.write_tiff(abs(wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output'), dtype='float32', overwrite=True)
