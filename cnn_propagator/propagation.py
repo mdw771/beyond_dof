@@ -27,7 +27,7 @@ except:
     mpi_ok = False
 
 
-def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, debug=False, original_grid_shape=None):
+def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, original_grid_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False):
 
     assert kernel_size % 2 == 1, 'kernel_size must be an odd number.'
     n_batch, shape_y, shape_x, n_slice = grid_delta.shape
@@ -65,38 +65,30 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     probe_size = probe.shape
     probe = np.tile(probe, [n_batch, 1, 1])
 
-    probe_array = []
-
-    # Build cyclic convolution matrix for kernel
-    # kernel_mat = np.zeros([np.prod(probe_size)] * 2)
-    # kernel_full_00 = np.zeros(probe_size)
-    # kernel_full_00[:kernel_size, :kernel_size] = kernel
-    # kernel_full_00 = np.roll(kernel_full_00, -half_kernel_size, axis=0)
-    # kernel_full_00 = np.roll(kernel_full_00, -half_kernel_size, axis=1)
-    # kernel_mat[0, :] = kernel_full_00.flatten()
-    # for i in trange(probe_size[0]):
-    #     for j in range(probe_size[1]):
-    #         if i != 0 or j != 0:
-    #             kernel_temp = np.roll(kernel_full_00, i, axis=0)
-    #             kernel_temp = np.roll(kernel_temp, j, axis=1)
-    #             kernel_mat[i * probe_size[1] + j, :] = kernel_temp.flatten()
-
-
-    t0 = time.time()
+    # probe_array = []
 
     edge_val = 1.0
 
+    t_tot = t_init
+
     initial_int = probe[0, 0, 0]
     for i_slice in trange(n_slice):
-        this_delta_batch = grid_delta[:, :, :, i_slice]
-        this_beta_batch = grid_beta[:, :, :, i_slice]
-        c = np.exp(1j * k * this_delta_batch - k * this_beta_batch)
+        if i_slice % 5 == 0 and debug:
+            np.savetxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank)), np.array([i_slice, t_tot]))
+            dxchange.write_tiff(probe.real, os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
+            dxchange.write_tiff(probe.imag, os.path.join(debug_save_path, 'probe_imag_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
+        # Use np.array to convert memmap to memory object
+        delta_slice = np.array(grid_delta[:, :, :, i_slice])
+        beta_slice = np.array(grid_beta[:, :, :, i_slice])
+        t0 = time.time()
+        c = np.exp(1j * k * delta_slice - k * beta_slice)
         probe = probe * c
         probe = np.pad(probe, [[0, 0], [pad_len, pad_len], [pad_len, pad_len]], mode='constant', constant_values=edge_val)
         probe = convolve(probe, kernel, mode='valid', axes=([1, 2], [0, 1]))
         # Phase shift to incident wave induced by truncated kernel
         edge_val = sum(kernel.flatten() * edge_val)
-        probe_array.append(np.abs(probe))
+        t_tot += (time.time() - t0)
+        # probe_array.append(np.abs(probe))
 
     #  Correct intensity offset
     final_int = probe[0, 0, 0]
@@ -119,8 +111,8 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
                 h = get_kernel_ir(dist_nm, lmbda_nm, voxel_nm, np.array(grid_delta.shape[1:]))
                 probe = np.fft.ifft2(np.fft.ifftshift(np.fft.fftshift(np.fft.fft2(probe), axes=[1, 2]) * h, axes=[1, 2]))
 
-    if debug:
-        return probe, probe_array, time.time() - t0
+    if return_fft_time:
+        return probe, t_tot
     else:
         return probe
 

@@ -132,10 +132,27 @@ for this_size in size_ls:
             probe_real = np.pad(probe_real, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
             probe_imag = np.pad(probe_imag, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
 
+        # Start from where it stopped
+        i_repeat = 0
+        verbose = True if rank == 0 else False
+        debug_save_path = os.path.join(path_prefix, 'size_{}', 'debug').format(this_size)
+        if rank == 0:
+            if not os.path.exists(debug_save_path):
+                try:
+                    os.makedirs(debug_save_path)
+                except:
+                    warnings.warn('Failed to create debug_save_path.')
+            comm.Barrier()
+            if os.path.exists(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size))):
+                i_repeat = np.loadtxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)))[0]
+                i_repeat = int(i_repeat)
+
         dt_ls = np.zeros(n_repeats)
-        for i in range(n_repeats):
-            t0 = time.time()
-            wavefield = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
+        this_dt_ranks = np.zeros(n_ranks)
+        dt_ranks = np.zeros(n_ranks)
+        for i in range(i_repeat, n_repeats):
+            np.savetxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)), np.array([i]))
+            wavefield, dt = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
                                                  probe_real[
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
                                                  px_st:px_end + 2 * safe_zone_width_side],
@@ -143,17 +160,23 @@ for this_size in size_ls:
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
                                                  px_st:px_end + 2 * safe_zone_width_side],
                                                  energy_ev, [psize_cm] * 3, kernel_size=kernel_size, free_prop_cm=None,
-                                                 debug=False,
-                                                 original_grid_shape=original_grid_shape)
+                                                 debug=True,
+                                                 original_grid_shape=original_grid_shape,
+                                                 return_fft_time=True,
+                                                 debug_save_path=debug_save_path,
+                                                 rank=rank, t_init=0, verbose=verbose)
 
+            t0 = time.time()
             this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')
             this_full_wavefield[:, line_st:line_end, px_st:px_end] = wavefield[:,
                                                                      safe_zone_width:safe_zone_width + (line_end - line_st),
                                                                      safe_zone_width_side:safe_zone_width_side + (px_end - px_st)]
             full_wavefield = np.zeros_like(this_full_wavefield, dtype='complex64')
             comm.Allreduce(this_full_wavefield, full_wavefield)
-            dt = time.time() - t0
-            dt_ls[i] = dt
+            dt += (time.time() - t0)
+            this_dt_ranks[rank] = dt
+            comm.Allreduce(this_dt_ranks, dt_ranks)
+            dt_ls[i] = dt_ranks.max()
 
             if rank == 0 and i == 0:
                 dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output'.format(kernel_size)), dtype='float32', overwrite=True)
