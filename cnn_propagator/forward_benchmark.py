@@ -42,7 +42,7 @@ n_repeats = 100
 
 # Create report
 if rank == 0:
-    f = open(os.path.join(path_prefix, 'report.csv'), 'w')
+    f = open(os.path.join(path_prefix, 'report_fft.csv'), 'a')
     f.write('algorithm,object_size,kernel_size,safezone_width,avg_time,mse_with_fft\n')
 
 # Do a FFT based propagation

@@ -42,7 +42,7 @@ n_repeats = 100
 
 # Create report
 if rank == 0:
-    f = open(os.path.join(path_prefix, 'report.csv'), 'w')
+    f = open(os.path.join(path_prefix, 'report_conv.csv'), 'a')
     f.write('algorithm,object_size,kernel_size,safezone_width,avg_time,mse_with_fft\n')
 
 # Benchmark convolution propagation
@@ -142,10 +142,10 @@ for this_size in size_ls:
                     os.makedirs(debug_save_path)
                 except:
                     warnings.warn('Failed to create debug_save_path.')
-            comm.Barrier()
-            if os.path.exists(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size))):
-                i_repeat = np.loadtxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)))[0]
-                i_repeat = int(i_repeat)
+        comm.Barrier()
+        if os.path.exists(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size))):
+            i_repeat = np.loadtxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)))
+            i_repeat = int(i_repeat)
 
         dt_ls = np.zeros(n_repeats)
         this_dt_ranks = np.zeros(n_ranks)
