@@ -160,11 +160,11 @@ for this_size in size_ls:
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
                                                  px_st:px_end + 2 * safe_zone_width_side],
                                                  energy_ev, [psize_cm] * 3, kernel_size=kernel_size, free_prop_cm=None,
-                                                 debug=True,
+                                                 debug=False,
                                                  original_grid_shape=original_grid_shape,
                                                  return_fft_time=True,
                                                  debug_save_path=debug_save_path,
-                                                 rank=rank, t_init=0, verbose=verbose)
+                                                 rank=rank, t_init=0, verbose=verbose, starting_slice=0)
 
             t0 = time.time()
             this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')

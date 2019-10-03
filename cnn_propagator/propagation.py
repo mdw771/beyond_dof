@@ -72,7 +72,7 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     t_tot = t_init
 
     initial_int = probe[0, 0, 0]
-    for i_slice in trange(n_slice):
+    for i_slice in trange(starting_slice, n_slice, disable=(not verbose)):
         if i_slice % 5 == 0 and debug:
             np.savetxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank)), np.array([i_slice, t_tot]))
             dxchange.write_tiff(probe.real, os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
