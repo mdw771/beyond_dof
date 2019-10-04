@@ -43,7 +43,8 @@ n_repeats = 100
 # Create report
 if rank == 0:
     f = open(os.path.join(path_prefix, 'report_conv.csv'), 'a')
-    f.write('algorithm,object_size,kernel_size,safezone_width,avg_time,mse_with_fft\n')
+    if os.path.getsize(os.path.join(path_prefix, 'report_fft.csv')) == 0:
+        f.write('algorithm,object_size,kernel_size,safezone_width,avg_time,mse_with_fft\n')
 
 # Benchmark convolution propagation
 for this_size in size_ls:

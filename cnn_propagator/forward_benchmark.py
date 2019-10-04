@@ -32,10 +32,10 @@ except:
 energy_ev = 3000
 lmbda_nm = 1.24 / (energy_ev / 1e3)
 psize_min_cm = 100e-7
-kernel_size_ls = 2 ** np.array([2, 3, 4, 5, 6]) + 1
 free_prop_cm = 0
 ######################################################################
-size_ls = np.array([256, 512, 1024, 2048, 4096])
+# size_ls = np.array([256, 512, 1024, 2048, 4096])
+size_ls = np.array([4096])
 #####################################################################
 path_prefix = os.path.join(os.getcwd(), 'charcoal')
 n_repeats = 100
@@ -43,7 +43,8 @@ n_repeats = 100
 # Create report
 if rank == 0:
     f = open(os.path.join(path_prefix, 'report_fft.csv'), 'a')
-    f.write('algorithm,object_size,kernel_size,safezone_width,avg_time,mse_with_fft\n')
+    if os.path.getsize(os.path.join(path_prefix, 'report_fft.csv')) == 0:
+        f.write('algorithm,object_size,kernel_size,safezone_width,avg_time,mse_with_fft\n')
 
 # Do a FFT based propagation
 for this_size in size_ls:
