@@ -49,6 +49,7 @@ if rank == 0:
 # Benchmark convolution propagation
 for this_size in size_ls:
 
+    if rank == 0: print('This size is {}.'.format(this_size))
     grid_delta = dxchange.read_tiff(os.path.join(path_prefix, 'phantom', 'size_{}', 'grid_delta.tiff').format(this_size))
     grid_beta = dxchange.read_tiff(os.path.join(path_prefix, 'phantom', 'size_{}', 'grid_beta.tiff').format(this_size))
     grid_delta = np.swapaxes(np.swapaxes(grid_delta, 0, 1), 1, 2)
@@ -68,6 +69,7 @@ for this_size in size_ls:
         os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
     for kernel_size in kernel_size_ls:
+        if rank == 0: print('  This kernel size is {}.'.format(kernel_size))
         safe_zone_width = ceil(
             4.0 * np.sqrt((psize_cm * 1e7 * grid_delta.shape[-1] + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7)) + (kernel_size // 2) + 1
 
@@ -106,7 +108,7 @@ for this_size in size_ls:
                         :]
 
         # During padding, sub_grids are read into the RAM
-        pad_top, pad_bottom = (0, 0)
+        pad_top, pad_bottom, pad_left, pad_right = (0, 0, 0, 0)
         if line_st < safe_zone_width:
             sub_grid_delta = np.pad(sub_grid_delta, [[0, 0], [safe_zone_width - line_st, 0], [0, 0], [0, 0]],
                                     mode='constant', constant_values=0)
@@ -124,14 +126,26 @@ for this_size in size_ls:
             probe_imag = np.pad(probe_imag, [[0, line_end + safe_zone_width - n_lines], [0, 0]], mode='edge')
             pad_bottom = safe_zone_width
         if safe_zone_width_side > 0:
-            sub_grid_delta = np.pad(sub_grid_delta,
-                                    [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
-                                    mode='constant', constant_values=0)
-            sub_grid_beta = np.pad(sub_grid_beta,
-                                   [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
-                                   mode='constant', constant_values=0)
-            probe_real = np.pad(probe_real, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
-            probe_imag = np.pad(probe_imag, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
+            if px_st < safe_zone_width_side:
+                sub_grid_delta = np.pad(sub_grid_delta,
+                                        [[0, 0], [0, 0], [safe_zone_width_side - px_st, 0], [0, 0]],
+                                        mode='constant', constant_values=0)
+                sub_grid_beta = np.pad(sub_grid_beta,
+                                       [[0, 0], [0, 0], [safe_zone_width_side - px_st, 0], [0, 0]],
+                                       mode='constant', constant_values=0)
+                probe_real = np.pad(probe_real, [[0, 0], [safe_zone_width_side - px_st, 0, 0]], mode='edge')
+                probe_imag = np.pad(probe_imag, [[0, 0], [safe_zone_width_side - px_st, 0, 0]], mode='edge')
+                pad_left = safe_zone_width_side - px_st
+            if (n_pixels_per_line - px_end + 1) < safe_zone_width_side:
+                sub_grid_delta = np.pad(sub_grid_delta,
+                                        [[0, 0], [0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line], [0, 0]],
+                                        mode='constant', constant_values=0)
+                sub_grid_beta = np.pad(sub_grid_beta,
+                                       [[0, 0], [0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line], [0, 0]],
+                                       mode='constant', constant_values=0)
+                probe_real = np.pad(probe_real, [[0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line]], mode='edge')
+                probe_imag = np.pad(probe_imag, [[0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line]], mode='edge')
+                pad_right = px_end + safe_zone_width_side - n_pixels_per_line
 
         # Start from where it stopped
         i_repeat = 0
@@ -152,17 +166,18 @@ for this_size in size_ls:
         this_dt_ranks = np.zeros(n_ranks)
         dt_ranks = np.zeros(n_ranks)
         for i in range(i_repeat, n_repeats):
+            if rank == 0: print('    This i_repeat is {}.'.format(i_repeat))
             np.savetxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)), np.array([i]))
             wavefield, dt = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
                                                  probe_real[
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                                                 px_st:px_end + 2 * safe_zone_width_side],
+                                                 pad_left + px_st - safe_zone_width:pad_left + px_end + safe_zone_width_side],
                                                  probe_imag[
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                                                 px_st:px_end + 2 * safe_zone_width_side],
+                                                 pad_left + px_st - safe_zone_width:pad_left + px_end + safe_zone_width_side],
                                                  energy_ev, [psize_cm] * 3, kernel_size=kernel_size, free_prop_cm=None,
                                                  debug=False,
-                                                 original_grid_shape=original_grid_shape,
+                                                 original_grid_shape=sub_grid_delta.shape[1:],
                                                  return_fft_time=True,
                                                  debug_save_path=debug_save_path,
                                                  rank=rank, t_init=0, verbose=verbose, starting_slice=0)

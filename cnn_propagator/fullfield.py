@@ -125,7 +125,7 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
                         :]
 
         # During padding, sub_grids are read into the RAM 
-        pad_top = 0
+        pad_top, pad_bottom, pad_left, pad_right = (0, 0, 0, 0)
         this_probe_real, this_probe_imag = (np.copy(probe_real), np.copy(probe_imag))
         if line_st < safe_zone_width:
             sub_this_obj_delta = np.pad(sub_this_obj_delta, [[0, 0], [safe_zone_width - line_st, 0], [0, 0], [0, 0]],
@@ -143,22 +143,34 @@ def reconstruct_fullfield(fname, theta_st=0, theta_end=PI, n_epochs='auto', crit
             this_probe_real = np.pad(this_probe_real, [[0, line_end + safe_zone_width - n_lines], [0, 0]], mode='edge')
             this_probe_imag = np.pad(this_probe_imag, [[0, line_end + safe_zone_width - n_lines], [0, 0]], mode='edge')
         if safe_zone_width_side > 0:
-            sub_this_obj_delta = np.pad(sub_this_obj_delta,
-                                    [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
-                                    mode='constant', constant_values=0)
-            sub_this_obj_beta = np.pad(sub_this_obj_beta,
-                                   [[0, 0], [0, 0], [safe_zone_width_side, safe_zone_width_side], [0, 0]],
-                                   mode='constant', constant_values=0)
-            this_probe_real = np.pad(this_probe_real, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
-            this_probe_imag = np.pad(this_probe_imag, [[0, 0], [safe_zone_width_side, safe_zone_width_side]], mode='edge')
+            if px_st < safe_zone_width_side:
+                sub_this_obj_delta = np.pad(sub_this_obj_delta,
+                                        [[0, 0], [0, 0], [safe_zone_width_side - px_st, 0], [0, 0]],
+                                        mode='constant', constant_values=0)
+                sub_this_obj_beta = np.pad(sub_this_obj_beta,
+                                       [[0, 0], [0, 0], [safe_zone_width_side - px_st, 0], [0, 0]],
+                                       mode='constant', constant_values=0)
+                this_probe_real = np.pad(this_probe_real, [[0, 0], [safe_zone_width_side - px_st, 0, 0]], mode='edge')
+                this_probe_imag = np.pad(this_probe_imag, [[0, 0], [safe_zone_width_side - px_st, 0, 0]], mode='edge')
+                pad_left = safe_zone_width_side - px_st
+            if (n_pixels_per_line - px_end + 1) < safe_zone_width_side:
+                sub_this_obj_delta = np.pad(sub_this_obj_delta,
+                                        [[0, 0], [0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line], [0, 0]],
+                                        mode='constant', constant_values=0)
+                sub_this_obj_beta = np.pad(sub_this_obj_beta,
+                                       [[0, 0], [0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line], [0, 0]],
+                                       mode='constant', constant_values=0)
+                this_probe_real = np.pad(this_probe_real, [[0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line]], mode='edge')
+                this_probe_imag = np.pad(this_probe_imag, [[0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line]], mode='edge')
+                pad_right = px_end + safe_zone_width_side - n_pixels_per_line
 
         exiting_batch = multislice_propagate_cnn(sub_this_obj_delta, sub_this_obj_beta,
                                                  this_probe_real[
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                                                 px_st:px_end + 2 * safe_zone_width_side],
+                                                 pad_left + px_st - safe_zone_width:pad_left + px_end + safe_zone_width_side],
                                                  this_probe_imag[
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                                                 px_st:px_end + 2 * safe_zone_width_side],
+                                                 pad_left + px_st - safe_zone_width:pad_left + px_end + safe_zone_width_side],
                                                  energy_ev, [psize_cm] * 3, kernel_size=kernel_size,
                                                  free_prop_cm=free_prop_cm, debug=False,
                                                  original_grid_shape=original_grid_shape)
