@@ -171,10 +171,10 @@ for this_size in size_ls:
             wavefield, dt = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
                                                  probe_real[
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                                                 pad_left + px_st - safe_zone_width:pad_left + px_end + safe_zone_width_side],
+                                                 pad_left + px_st - safe_zone_width_side:pad_left + px_end + safe_zone_width_side],
                                                  probe_imag[
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                                                 pad_left + px_st - safe_zone_width:pad_left + px_end + safe_zone_width_side],
+                                                 pad_left + px_st - safe_zone_width_side:pad_left + px_end + safe_zone_width_side],
                                                  energy_ev, [psize_cm] * 3, kernel_size=kernel_size, free_prop_cm=None,
                                                  debug=False,
                                                  original_grid_shape=sub_grid_delta.shape[1:],
