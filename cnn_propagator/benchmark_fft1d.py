@@ -42,8 +42,8 @@ n_repeats = 100
 
 # Create report
 if rank == 0:
-    f = open(os.path.join(path_prefix, 'report_conv.csv'), 'a')
-    if os.path.getsize(os.path.join(path_prefix, 'report_conv.csv')) == 0:
+    f = open(os.path.join(path_prefix, 'report_fft1d.csv'), 'a')
+    if os.path.getsize(os.path.join(path_prefix, 'report_fft1d.csv')) == 0:
         f.write('algorithm,object_size,kernel_size,safezone_width,avg_working_time,avg_total_time,mse_with_fft\n')
 
 # Benchmark convolution propagation
@@ -87,17 +87,6 @@ for this_size in size_ls:
             px_st = 0
             px_end = n_pixels_per_line
             safe_zone_width_side = 0
-        else:
-            n_lines_spill = n_ranks % n_lines
-            n_ranks_per_line_base = n_ranks // n_lines
-            n_ranks_spill = n_lines_spill * (n_ranks_per_line_base + 1)
-            line_st = rank // (n_ranks_per_line_base + 1) if rank < n_ranks_spill else (rank - n_ranks_spill) // n_ranks_per_line_base + n_lines_spill
-            line_end = line_st + 1
-            n_ranks_per_line = n_ranks_per_line_base if line_st < n_lines_spill else n_ranks_per_line_base + 1
-            i_seg = rank % n_ranks_per_line
-            px_st = int(n_pixels_per_line * (float(i_seg) / n_ranks_per_line))
-            px_end = min([int(n_pixels_per_line * (float(i_seg + 1) / n_ranks_per_line)) + 1, n_pixels_per_line])
-            safe_zone_width_side = safe_zone_width
 
         # sub_grids are memmaps
         sub_grid_delta = grid_delta[:, max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, n_lines),

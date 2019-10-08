@@ -43,8 +43,8 @@ n_repeats = 100
 # Create report
 if rank == 0:
     f = open(os.path.join(path_prefix, 'report_pfft.csv'), 'a')
-    if os.path.getsize(os.path.join(path_prefix, 'report_fft.csv')) == 0:
-        f.write('algorithm,object_size,kernel_size,safezone_width,avg_time,mse_with_fft\n')
+    if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
+        f.write('algorithm,object_size,kernel_size,safezone_width,avg_working_time,avg_total_time,mse_with_fft\n')
 
 # Benchmark partial FFT propagation
 for this_size in size_ls:
@@ -58,7 +58,6 @@ for this_size in size_ls:
     grid_beta = dxchange.read_tiff(os.path.join(path_prefix, 'phantom', 'size_{}', 'grid_beta.tiff').format(this_size))
     grid_delta = np.swapaxes(np.swapaxes(grid_delta, 0, 1), 1, 2)
     grid_beta = np.swapaxes(np.swapaxes(grid_beta, 0, 1), 1, 2)
-    dxchange.write_tiff(grid_delta, 'charcoal/size_256/test.tiff', dtype='float32', overwrite=True)
 
     grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
     grid_beta = np.reshape(grid_beta, [1, *grid_beta.shape])
@@ -135,9 +134,13 @@ for this_size in size_ls:
         block_probe_real_batch[ind, :, :] = sub_probe_real
         block_probe_imag_batch[ind, :, :] = sub_probe_imag
 
-    dt_ls = np.zeros(n_repeats)
+    try:
+        dt_ls = np.loadtxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'))
+    except:
+        # 1st column excludes hard drive I/O, while 2nd column is the total time.
+        dt_ls = np.zeros([n_repeats, 2])
     for i in range(n_repeats):
-
+        t_tot_0 = time.time()
         wavefield, dt = multislice_propagate_batch_numpy(block_delta_batch, block_beta_batch, block_probe_real_batch, block_probe_imag_batch, energy_ev,
                                                          [psize_cm] * 3, obj_batch_shape=block_delta_batch.shape,
                                                          return_fft_time=True, starting_slice=0, t_init=0,
@@ -157,17 +160,20 @@ for this_size in size_ls:
         full_wavefield = np.zeros_like(this_full_wavefield, dtype='complex64')
         comm.Allreduce(this_full_wavefield, full_wavefield)
         dt += time.time() - t0
-        dt_ls[i] = dt
+        dt_ls[i, 0] = dt
+        dt_ls[i, 1] = time.time() - t_tot_0
 
         if rank == 0 and i == 0:
             dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'partial_fft_output'), dtype='float32', overwrite=True)
+        if rank == 0:
+            np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
         comm.Barrier()
 
-    dt_avg = np.mean(dt_ls)
+    dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
     if rank == 0:
         print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_avg))
         img = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'partial_fft_output.tiff'))
-        f.write('pfft,{},0,{},{},{}\n'.format(this_size, safe_zone_width, dt_avg, np.mean((img - ref) ** 2)))
+        f.write('pfft,{},0,{},{},{},{}\n'.format(this_size, safe_zone_width, dt_avg, dt_tot_avg, np.mean((img - ref) ** 2)))
         f.flush()
         os.fsync(f.fileno())
 
