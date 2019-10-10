@@ -27,10 +27,15 @@ except:
     mpi_ok = False
 
 
-def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, original_grid_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False):
+def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, original_grid_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
 
+    """
+    grid_delta and beta must be 4D arrays even if repeating_slice is not None (in which case the last dimension is 1).
+    """
     assert kernel_size % 2 == 1, 'kernel_size must be an odd number.'
     n_batch, shape_y, shape_x, n_slice = grid_delta.shape
+    if repeating_slice is not None:
+        n_slice = repeating_slice
     lmbda_nm = 1240. / energy_ev
     voxel_nm = np.array(psize_cm) * 1.e7
     delta_nm = voxel_nm[-1]
@@ -78,8 +83,12 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
             dxchange.write_tiff(probe.real, os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
             dxchange.write_tiff(probe.imag, os.path.join(debug_save_path, 'probe_imag_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
         # Use np.array to convert memmap to memory object
-        delta_slice = np.array(grid_delta[:, :, :, i_slice])
-        beta_slice = np.array(grid_beta[:, :, :, i_slice])
+        if repeating_slice is None:
+            delta_slice = np.array(grid_delta[:, :, :, i_slice])
+            beta_slice = np.array(grid_beta[:, :, :, i_slice])
+        else:
+            delta_slice = grid_delta[:, :, :, 0]
+            beta_slice = grid_beta[:, :, :, 0]
         t0 = time.time()
         c = np.exp(1j * k * delta_slice - k * beta_slice)
         probe = probe * c

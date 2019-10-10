@@ -31,7 +31,8 @@ except:
 
 energy_ev = 3000
 lmbda_nm = 1.24 / (energy_ev / 1e3)
-psize_min_cm = 100e-7
+psize_cm = 100e-7
+slice_spacing_cm = 100e-7
 kernel_size_ls = 2 ** np.array([2, 3, 4, 5, 6]) + 1
 free_prop_cm = 0
 ######################################################################
@@ -50,7 +51,7 @@ if rank == 0:
 for this_size in size_ls:
     
     size_factor = size_ls[-1] // this_size
-    psize_cm = psize_min_cm * size_factor
+    # psize_cm = psize_min_cm * size_factor
 
     verbose = False if rank != 0 else True
 
@@ -71,7 +72,7 @@ for this_size in size_ls:
         os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
     safe_zone_width = ceil(
-        4.0 * np.sqrt((psize_cm * 1e7 * grid_delta.shape[-1] + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7)) + 1
+        4.0 * np.sqrt((slice_spacing_cm * 1e7 * grid_delta.shape[-1] + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7)) + 1
 
     # Must satisfy:
     # 1. n_block_x * n_block_y = n_ranks
@@ -142,7 +143,7 @@ for this_size in size_ls:
     for i in range(n_repeats):
         t_tot_0 = time.time()
         wavefield, dt = multislice_propagate_batch_numpy(block_delta_batch, block_beta_batch, block_probe_real_batch, block_probe_imag_batch, energy_ev,
-                                                         [psize_cm] * 3, obj_batch_shape=block_delta_batch.shape,
+                                                         [psize_cm, psize_cm, slice_spacing_cm], obj_batch_shape=block_delta_batch.shape,
                                                          return_fft_time=True, starting_slice=0, t_init=0,
                                                          debug=False, debug_save_path=None,
                                                          rank=rank, verbose=verbose)

@@ -422,3 +422,16 @@ def estimate_safe_zone_width(delta_nm, n_slices, energy_ev, free_prop_cm=0, kern
 
     lmbda_nm = 1240. / energy_ev
     return ceil(fringe_spacing_coefficient * sqrt((delta_nm * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (delta_nm)) + (kernel_size // 2) + 1
+
+
+def estimate_kernel_size(delta_nm, energy_ev, psize_nm):
+
+    lmbda_nm = 1240. / energy_ev
+    r = delta_nm * lmbda_nm / np.sqrt(4 * psize_nm ** 2 - lmbda_nm ** 2)
+    r = int(ceil(r))
+    if r % 2 == 0:
+        r += 1
+    return r
+
+if __name__ == '__main__':
+    print(estimate_kernel_size(350, 25000, 0.55))
