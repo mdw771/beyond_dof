@@ -212,15 +212,15 @@ for this_size in size_ls:
                     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
                 comm.Barrier()
 
-            dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
-            if rank == 0:
-                print('CONV: For n_ranks {} and kernel n_ranks {}, average dt = {} s.'.format(this_size, kernel_size, dt_avg))
-                img = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output.tiff'.format(kernel_size)))
-                f.write('conv,{},{},{},{},{},{}\n'.format(this_size, kernel_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg))
-                f.flush()
-                os.fsync(f.fileno())
+                dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
+                if rank == 0:
+                    print('CONV: For n_ranks {} and kernel n_ranks {}, average dt = {} s.'.format(this_size, kernel_size, dt_avg))
+                    img = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output.tiff'.format(kernel_size)))
+                    f.write('conv,{},{},{},{},{},{}\n'.format(this_size, kernel_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg))
+                    f.flush()
+                    os.fsync(f.fileno())
 
-            comm.Barrier()
+                comm.Barrier()
 
 if rank == 0:
     f.close()
