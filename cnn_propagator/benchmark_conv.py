@@ -175,6 +175,8 @@ for this_size in size_ls:
 
         try:
             dt_ls = np.loadtxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'))
+            if dt_ls.ndim == 1:
+                dt_ls = np.reshape(dt_ls, [1, 2])
         except:
             # 1st column excludes hard drive I/O, while 2nd column is the total time.
             dt_ls = np.zeros([n_repeats, 2])
