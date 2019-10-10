@@ -60,7 +60,7 @@ for this_size in size_ls:
         free_prop_cm = 0
         slice_spacing_cm = thick_zp_cm / n_slices
 
-        if rank == 0: print('This size is {}.'.format(this_size))
+        if rank == 0: print('This size is {}. This n_slices is {}'.format(this_size, n_slices))
         img = np.load(os.path.join(path_prefix, 'size_{}', 'zp.npy').format(this_size))
         grid_delta = np.ones([1, *img.shape, 1]) * delta
         grid_beta = np.ones([1, *img.shape, 1]) * beta
@@ -158,69 +158,69 @@ for this_size in size_ls:
                 probe_imag = np.pad(probe_imag, [[0, 0], [0, px_end + safe_zone_width_side - n_pixels_per_line]], mode='edge')
                 pad_right = px_end + safe_zone_width_side - n_pixels_per_line
 
-            # Start from where it stopped
-            i_repeat = 0
-            verbose = True if rank == 0 else False
-            debug_save_path = os.path.join(path_prefix, 'size_{}', 'debug').format(this_size)
+        # Start from where it stopped
+        i_repeat = 0
+        verbose = True if rank == 0 else False
+        debug_save_path = os.path.join(path_prefix, 'size_{}', 'debug').format(this_size)
+        if rank == 0:
+            if not os.path.exists(debug_save_path):
+                try:
+                    os.makedirs(debug_save_path)
+                except:
+                    warnings.warn('Failed to create debug_save_path.')
+        comm.Barrier()
+        if os.path.exists(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size))):
+            i_repeat = np.loadtxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)))
+            i_repeat = int(i_repeat)
+
+        try:
+            dt_ls = np.loadtxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'))
+        except:
+            # 1st column excludes hard drive I/O, while 2nd column is the total time.
+            dt_ls = np.zeros([n_repeats, 2])
+        for i in range(i_repeat, n_repeats):
+            if rank == 0: print('    This i_repeat is {}.'.format(i_repeat))
+            np.savetxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)), np.array([i]))
+            t_tot_0 = time.time()
+            wavefield, dt = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
+                                                 probe_real[
+                                                 pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
+                                                 pad_left + px_st - safe_zone_width_side:pad_left + px_end + safe_zone_width_side],
+                                                 probe_imag[
+                                                 pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
+                                                 pad_left + px_st - safe_zone_width_side:pad_left + px_end + safe_zone_width_side],
+                                                 energy_ev, [psize_cm, psize_cm, slice_spacing_cm], kernel_size=kernel_size, free_prop_cm=None,
+                                                 debug=False,
+                                                 return_fft_time=True,
+                                                 debug_save_path=debug_save_path,
+                                                 rank=rank, t_init=0, verbose=verbose, starting_slice=0)
+
+            t0 = time.time()
+            this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')
+            this_full_wavefield[:, line_st:line_end, px_st:px_end] = wavefield[:,
+                                                                     safe_zone_width:safe_zone_width + (line_end - line_st),
+                                                                     safe_zone_width_side:safe_zone_width_side + (px_end - px_st)]
+            full_wavefield = np.zeros_like(this_full_wavefield, dtype='complex64')
+            comm.Allreduce(this_full_wavefield, full_wavefield)
+            dt += (time.time() - t0)
+            dt_ls[i, 0] = dt
+            dt_ls[i, 1] = time.time() - t_tot_0
+
+            if rank == 0 and i == 0:
+                dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output'.format(kernel_size)), dtype='float32', overwrite=True)
             if rank == 0:
-                if not os.path.exists(debug_save_path):
-                    try:
-                        os.makedirs(debug_save_path)
-                    except:
-                        warnings.warn('Failed to create debug_save_path.')
+                np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
             comm.Barrier()
-            if os.path.exists(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size))):
-                i_repeat = np.loadtxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)))
-                i_repeat = int(i_repeat)
 
-            try:
-                dt_ls = np.loadtxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'))
-            except:
-                # 1st column excludes hard drive I/O, while 2nd column is the total time.
-                dt_ls = np.zeros([n_repeats, 2])
-            for i in range(i_repeat, n_repeats):
-                if rank == 0: print('    This i_repeat is {}.'.format(i_repeat))
-                np.savetxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)), np.array([i]))
-                t_tot_0 = time.time()
-                wavefield, dt = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
-                                                     probe_real[
-                                                     pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                                                     pad_left + px_st - safe_zone_width_side:pad_left + px_end + safe_zone_width_side],
-                                                     probe_imag[
-                                                     pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
-                                                     pad_left + px_st - safe_zone_width_side:pad_left + px_end + safe_zone_width_side],
-                                                     energy_ev, [psize_cm, psize_cm, slice_spacing_cm], kernel_size=kernel_size, free_prop_cm=None,
-                                                     debug=False,
-                                                     return_fft_time=True,
-                                                     debug_save_path=debug_save_path,
-                                                     rank=rank, t_init=0, verbose=verbose, starting_slice=0)
+        dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
+        if rank == 0:
+            print('CONV: For n_ranks {} and kernel n_ranks {}, average dt = {} s.'.format(this_size, kernel_size, dt_avg))
+            img = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output.tiff'.format(kernel_size)))
+            f.write('conv,{},{},{},{},{},{}\n'.format(this_size, kernel_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg))
+            f.flush()
+            os.fsync(f.fileno())
 
-                t0 = time.time()
-                this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')
-                this_full_wavefield[:, line_st:line_end, px_st:px_end] = wavefield[:,
-                                                                         safe_zone_width:safe_zone_width + (line_end - line_st),
-                                                                         safe_zone_width_side:safe_zone_width_side + (px_end - px_st)]
-                full_wavefield = np.zeros_like(this_full_wavefield, dtype='complex64')
-                comm.Allreduce(this_full_wavefield, full_wavefield)
-                dt += (time.time() - t0)
-                dt_ls[i, 0] = dt
-                dt_ls[i, 1] = time.time() - t_tot_0
-
-                if rank == 0 and i == 0:
-                    dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output'.format(kernel_size)), dtype='float32', overwrite=True)
-                if rank == 0:
-                    np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
-                comm.Barrier()
-
-                dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
-                if rank == 0:
-                    print('CONV: For n_ranks {} and kernel n_ranks {}, average dt = {} s.'.format(this_size, kernel_size, dt_avg))
-                    img = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output.tiff'.format(kernel_size)))
-                    f.write('conv,{},{},{},{},{},{}\n'.format(this_size, kernel_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg))
-                    f.flush()
-                    os.fsync(f.fileno())
-
-                comm.Barrier()
+        comm.Barrier()
 
 if rank == 0:
     f.close()
