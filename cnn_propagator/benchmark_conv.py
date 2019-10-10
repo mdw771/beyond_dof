@@ -174,6 +174,7 @@ for this_size in size_ls:
         #     i_repeat = int(i_repeat)
 
         try:
+            raise Exception
             dt_ls = np.loadtxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'))
             if dt_ls.ndim == 1:
                 dt_ls = np.reshape(dt_ls, [1, 2])
