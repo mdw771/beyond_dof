@@ -169,9 +169,9 @@ for this_size in size_ls:
                 except:
                     warnings.warn('Failed to create debug_save_path.')
         comm.Barrier()
-        if os.path.exists(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size))):
-            i_repeat = np.loadtxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)))
-            i_repeat = int(i_repeat)
+        # if os.path.exists(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size))):
+        #     i_repeat = np.loadtxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)))
+        #     i_repeat = int(i_repeat)
 
         try:
             dt_ls = np.loadtxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'))
@@ -182,7 +182,7 @@ for this_size in size_ls:
             dt_ls = np.zeros([n_repeats, 2])
         for i in range(i_repeat, n_repeats):
             if rank == 0: print('    This i_repeat is {}.'.format(i_repeat))
-            np.savetxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)), np.array([i]))
+            # np.savetxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)), np.array([i]))
             t_tot_0 = time.time()
             wavefield, dt = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
                                                  probe_real[
@@ -209,15 +209,15 @@ for this_size in size_ls:
             dt_ls[i, 1] = time.time() - t_tot_0
 
             if rank == 0 and i == 0:
-                dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output'.format(kernel_size)), dtype='float32', overwrite=True)
-            if rank == 0:
-                np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
+                dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_nslices_{}_output.tiff'.format(kernel_size, n_slices)), dtype='float32', overwrite=True)
+            # if rank == 0:
+            #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
             comm.Barrier()
 
         dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
         if rank == 0:
             print('CONV: For n_ranks {} and kernel n_ranks {}, average dt = {} s.'.format(this_size, kernel_size, dt_avg))
-            img = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_output.tiff'.format(kernel_size)))
+            # img = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_nslices_{}_output.tiff'.format(kernel_size, n_slices)))
             f.write('conv,{},{},{},{},{},{}\n'.format(this_size, kernel_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg))
             f.flush()
             os.fsync(f.fileno())
