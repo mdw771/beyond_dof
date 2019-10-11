@@ -31,8 +31,10 @@ except:
     mpi_ok = False
 
 ######################################################################
-size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-n_slices_ls = np.arange(10, 600, 5)
+# size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
+# n_slices_ls = np.arange(10, 600, 5)
+size_ls = [256]
+n_slices_ls = [10]
 #####################################################################
 path_prefix = os.path.join(os.getcwd(), 'zp')
 n_repeats = 1
@@ -62,8 +64,10 @@ for this_size in size_ls:
 
         if rank == 0: print('This size is {}. This n_slices is {}'.format(this_size, n_slices))
         img = np.load(os.path.join(path_prefix, 'size_{}', 'zp.npy').format(this_size))
-        grid_delta = np.ones([1, *img.shape, 1]) * delta
-        grid_beta = np.ones([1, *img.shape, 1]) * beta
+        img_shape = img.shape
+        img = np.reshape(img, [1, *img_shape, 1])
+        grid_delta = np.ones([1, *img_shape, 1]) * img * delta
+        grid_beta = np.ones([1, *img_shape, 1]) * img * beta
         # grid_delta = np.swapaxes(np.swapaxes(grid_delta, 0, 1), 1, 2)
         # grid_beta = np.swapaxes(np.swapaxes(grid_beta, 0, 1), 1, 2)
         # grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
@@ -185,6 +189,10 @@ for this_size in size_ls:
             if rank == 0: print('    This i_repeat is {}.'.format(i_repeat))
             # np.savetxt(os.path.join(debug_save_path, 'current_irepeat_conv_kernel_{}.txt'.format(kernel_size)), np.array([i]))
             t_tot_0 = time.time()
+            # dxchange.write_tiff(sub_grid_delta[0, :, :, 0], 'zp/size_256/sub_grid_delta', dtype='float32', overwrite=True)
+            # dxchange.write_tiff(sub_grid_beta[0, :, :, 0], 'zp/size_256/sub_grid_beta', dtype='float32', overwrite=True)
+            # dxchange.write_tiff(probe_real, 'zp/size_256/probe_real', dtype='float32', overwrite=True)
+            # dxchange.write_tiff(probe_imag, 'zp/size_256/probe_imag', dtype='float32', overwrite=True)
             wavefield, dt = multislice_propagate_cnn(sub_grid_delta, sub_grid_beta,
                                                  probe_real[
                                                  pad_top + line_st - safe_zone_width:pad_top + line_end + safe_zone_width,
@@ -196,7 +204,7 @@ for this_size in size_ls:
                                                  debug=False,
                                                  return_fft_time=True,
                                                  debug_save_path=debug_save_path,
-                                                 rank=rank, t_init=0, verbose=verbose, starting_slice=0)
+                                                 rank=rank, t_init=0, verbose=verbose, starting_slice=0, repeating_slice=n_slices)
 
             t0 = time.time()
             this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')
