@@ -218,7 +218,8 @@ for this_size in size_ls:
             dt_ls[i, 1] = time.time() - t_tot_0
 
             if rank == 0 and i == 0:
-                dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_nslices_{}_output.tiff'.format(kernel_size, n_slices)), dtype='float32', overwrite=True)
+                # dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_nslices_{}_output.tiff'.format(kernel_size, n_slices)), dtype='float32', overwrite=True)
+                np.save(os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_nslices_{}_output'.format(kernel_size, n_slices)), full_wavefield)
             # if rank == 0:
             #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
             comm.Barrier()
