@@ -31,10 +31,10 @@ except:
     mpi_ok = False
 
 ######################################################################
-# size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-# n_slices_ls = np.arange(10, 600, 5)
-size_ls = [256]
-n_slices_ls = [10]
+size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
+n_slices_ls = np.arange(10, 600, 5)
+# size_ls = [256]
+# n_slices_ls = [10]
 #####################################################################
 path_prefix = os.path.join(os.getcwd(), 'zp')
 n_repeats = 1
