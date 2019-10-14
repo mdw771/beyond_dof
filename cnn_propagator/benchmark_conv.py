@@ -17,6 +17,8 @@ from math import ceil, floor
 from propagation import multislice_propagate_cnn
 from propagation_fft import multislice_propagate_batch_numpy
 
+t_limit = 170
+t_zero = time.time()
 
 try:
     comm = MPI.COMM_WORLD
@@ -247,6 +249,9 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             # Save checkpoint
             i_starting_nslice += 1
             save_checkpoint(i_size, i_nslices)
+
+        # Exit with status 0 before allocated time runs out
+        if (time.time() - t_zero) / 60 >= t_limit: sys.exit()
 
         comm.Barrier()
 
