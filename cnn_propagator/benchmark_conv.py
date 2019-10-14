@@ -35,15 +35,15 @@ except:
 
 def save_checkpoint(this_size_ind, this_nslice_ind):
     var_dict = {'this_size_ind': this_size_ind, 'this_nslice_ind': this_nslice_ind}
-    pickle.dump(open(os.path.join(path_prefix, 'checkpoint'), 'wb'), var_dict)
+    pickle.dump(var_dict, open(os.path.join(path_prefix, 'checkpoint'), 'wb'))
     return
 
 path_prefix = os.path.join(os.getcwd(), 'zp')
 ######################################################################
 size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
 n_slices_ls = np.arange(10, 600, 5)
-# size_ls = [256]
-# n_slices_ls = [10]
+# size_ls = [4096]
+# n_slices_ls = [100]
 try:
     cp = pickle.load(open(os.path.join(path_prefix, 'checkpoint'), 'rb'))
     i_starting_size = cp['this_size_ind']
@@ -99,9 +99,9 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         ref = dxchange.read_tiff(
             os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
-        if rank == 0: print('  This kernel size is {}.'.format(kernel_size))
         safe_zone_width = ceil(
-            4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7)) + (kernel_size // 2) + 1
+            3.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7)) + (kernel_size // 2) + 1
+        if rank == 0: print('  This kernel size is {}; safe zone width is {}.'.format(kernel_size, safe_zone_width))
 
         # Calculate the block range to be processed by each rank.
         # If the number of ranks is smaller than the number of lines, each rank will take 1 or more
@@ -233,7 +233,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             dt_ls[i, 1] = time.time() - t_tot_0
 
             if rank == 0 and i == 0:
-                # dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_nslices_{}_output.tiff'.format(kernel_size, n_slices)), dtype='float32', overwrite=True)
+                dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_nslices_{}_output.tiff'.format(kernel_size, n_slices)), dtype='float32', overwrite=True)
                 np.save(os.path.join(path_prefix, 'size_{}'.format(this_size), 'conv_kernel_{}_nslices_{}_output'.format(kernel_size, n_slices)), full_wavefield)
             # if rank == 0:
             #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
@@ -248,7 +248,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             os.fsync(f.fileno())
             # Save checkpoint
             i_starting_nslice += 1
-            save_checkpoint(i_size, i_nslices)
+            save_checkpoint(i_starting_size, i_starting_nslice)
 
         # Exit with status 0 before allocated time runs out
         if (time.time() - t_zero) / 60 >= t_limit: sys.exit()

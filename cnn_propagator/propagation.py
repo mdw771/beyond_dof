@@ -52,6 +52,8 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     if kernel_size % 2 == 0:
         warnings.warn('Kernel size should be odd.')
     # kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, np.array(grid_delta.shape[1:]))
+    print(delta_nm, voxel_nm)
+
     kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape - 1)
     kernel = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(kernel)))
     # dxchange.write_tiff(np.abs(kernel), 'test/kernel_abs', dtype='float32')
@@ -96,6 +98,9 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         probe = convolve(probe, kernel, mode='valid', axes=([1, 2], [0, 1]))
         # Phase shift to incident wave induced by truncated kernel
         edge_val = sum(kernel.flatten() * edge_val)
+        probe /= abs(edge_val)
+        edge_val /= abs(edge_val)
+        # if rank == 8: dxchange.write_tiff(abs(probe), 'zp/size_4096/temp/tmp_{:03d}'.format(i_slice), overwrite=True, dtype='float32'); print(edge_val)
         t_tot += (time.time() - t0)
         # probe_array.append(np.abs(probe))
 
