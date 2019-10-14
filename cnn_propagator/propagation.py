@@ -52,10 +52,11 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     if kernel_size % 2 == 0:
         warnings.warn('Kernel size should be odd.')
     # kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, np.array(grid_delta.shape[1:]))
-    print(delta_nm, voxel_nm)
 
     kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape - 1)
     kernel = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(kernel)))
+
+    # kernel = get_kernel_ir_real(delta_nm, lmbda_nm, voxel_nm, grid_shape - 1)
     # dxchange.write_tiff(np.abs(kernel), 'test/kernel_abs', dtype='float32')
     # dxchange.write_tiff(np.angle(kernel), 'test/kernel_phase', dtype='float32')
     # raise Exception
