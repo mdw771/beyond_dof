@@ -250,6 +250,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         comm.Barrier()
 
+    i_starting_nslice = 0
     i_starting_size += 1
 
 if rank == 0:
