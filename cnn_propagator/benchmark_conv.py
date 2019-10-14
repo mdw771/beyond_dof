@@ -32,7 +32,7 @@ except:
 
 
 def save_checkpoint(this_size_ind, this_nslice_ind):
-    var_dict = {'this_size': this_size_ind, 'this_nslice': this_nslice_ind}
+    var_dict = {'this_size_ind': this_size_ind, 'this_nslice_ind': this_nslice_ind}
     pickle.dump(os.path.join(path_prefix, 'checkpoint'), var_dict)
     return
 
@@ -45,7 +45,7 @@ n_slices_ls = np.arange(10, 600, 5)
 try:
     cp = pickle.load(os.path.join(path_prefix, 'checkpoint'))
     i_starting_size = cp['this_size_ind']
-    i_starting_nslice = cp['this_nslice']
+    i_starting_nslice = cp['this_nslice_ind']
 except:
     i_starting_size = 0
     i_starting_nslice = 0
