@@ -30,13 +30,26 @@ except:
     rank = 0
     mpi_ok = False
 
+
+def save_checkpoint(this_size_ind, this_nslice_ind):
+    var_dict = {'this_size': this_size_ind, 'this_nslice': this_nslice_ind}
+    pickle.dump(os.path.join(path_prefix, 'checkpoint'), var_dict)
+    return
+
+path_prefix = os.path.join(os.getcwd(), 'zp')
 ######################################################################
 size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
 n_slices_ls = np.arange(10, 600, 5)
 # size_ls = [256]
 # n_slices_ls = [10]
+try:
+    cp = pickle.load(os.path.join(path_prefix, 'checkpoint'))
+    i_starting_size = cp['this_size_ind']
+    i_starting_nslice = cp['this_nslice']
+except:
+    i_starting_size = 0
+    i_starting_nslice = 0
 #####################################################################
-path_prefix = os.path.join(os.getcwd(), 'zp')
 n_repeats = 1
 
 # Create report
@@ -46,9 +59,9 @@ if rank == 0:
         f.write('algorithm,object_size,kernel_size,n_slices,safezone_width,avg_working_time,avg_total_time\n')
 
 # Benchmark convolution propagation
-for this_size in size_ls:
+for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
-    for n_slices in n_slices_ls:
+    for n_slices in np.take(n_slices_ls, range(i_starting_nslice, len(n_slices_ls))):
 
         parameters = pickle.load(open(os.path.join(path_prefix, 'size_{}'.format(this_size), 'parameters.pickle'), 'rb'))
         beta = parameters['beta']
@@ -231,8 +244,13 @@ for this_size in size_ls:
             f.write('conv,{},{},{},{},{},{}\n'.format(this_size, kernel_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg))
             f.flush()
             os.fsync(f.fileno())
+            # Save checkpoint
+            i_starting_nslice += 1
+            save_checkpoint(i_size, i_nslices)
 
         comm.Barrier()
+
+    i_starting_size += 1
 
 if rank == 0:
     f.close()
