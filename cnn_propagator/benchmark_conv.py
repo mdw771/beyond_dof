@@ -101,7 +101,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         if rank == 0: print('  This kernel size is {}.'.format(kernel_size))
         safe_zone_width = ceil(
-            4.0 * np.sqrt((slice_spacing_cm * 1e7 * grid_delta.shape[-1] + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7)) + (kernel_size // 2) + 1
+            4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7)) + (kernel_size // 2) + 1
 
         # Calculate the block range to be processed by each rank.
         # If the number of ranks is smaller than the number of lines, each rank will take 1 or more
