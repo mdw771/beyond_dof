@@ -40,10 +40,10 @@ def save_checkpoint(this_size_ind, this_nslice_ind):
 
 path_prefix = os.path.join(os.getcwd(), 'zp')
 ######################################################################
-size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-n_slices_ls = np.arange(10, 600, 5)
-# size_ls = [4096]
-# n_slices_ls = [100]
+# size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
+# n_slices_ls = np.arange(10, 600, 5)
+size_ls = [4096]
+n_slices_ls = [50]
 try:
     cp = pickle.load(open(os.path.join(path_prefix, 'checkpoint'), 'rb'))
     i_starting_size = cp['this_size_ind']
@@ -73,7 +73,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         energy_ev = parameters['energy(in eV)']
         focal_len_m = parameters['focal_length']
         thick_zp_cm = 10e-4
-        kernel_size = 17
+        kernel_size = 51
         free_prop_cm = 0
         slice_spacing_cm = thick_zp_cm / n_slices
 

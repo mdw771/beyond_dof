@@ -13,11 +13,14 @@ import time
 
 from util import *
 
-def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False):
+def multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
 
     minibatch_size = obj_batch_shape[0]
-    grid_shape = obj_batch_shape[1:]
     voxel_nm = np.array(psize_cm) * 1.e7
+    grid_shape = obj_batch_shape[1:]
+    n_slice = grid_shape[-1]
+    if repeating_slice is not None:
+        n_slice = repeating_slice
     if probe_real.ndim == 2:
         wavefront = np.zeros([minibatch_size, obj_batch_shape[1], obj_batch_shape[2]], dtype='complex64')
         wavefront += (probe_real + 1j * probe_imag)
@@ -28,7 +31,6 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
     mean_voxel_nm = np.prod(voxel_nm) ** (1. / 3)
     size_nm = np.array(grid_shape) * voxel_nm
 
-    n_slice = obj_batch_shape[-1]
     delta_nm = voxel_nm[-1]
 
     # h = get_kernel_ir(delta_nm, lmbda_nm, voxel_nm, grid_shape)
@@ -36,18 +38,22 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
     k = 2. * PI * delta_nm / lmbda_nm
 
     t_tot = t_init
-    for i in trange(starting_slice, n_slice, disable=(not verbose)):
-        if i % 5 == 0 and debug:
-            np.savetxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank)), np.array([i, t_tot]))
+    for i_slice in trange(starting_slice, n_slice, disable=(not verbose)):
+        if i_slice % 5 == 0 and debug:
+            np.savetxt(os.path.join(debug_save_path, 'current_islice_rank_{}.txt'.format(rank)), np.array([i_slice, t_tot]))
             dxchange.write_tiff(wavefront.real, os.path.join(debug_save_path, 'probe_real_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
             dxchange.write_tiff(wavefront.imag, os.path.join(debug_save_path, 'probe_imag_rank_{}.tiff'.format(rank)), dtype='float32', overwrite=True)
         # Use np.array to convert memmap to memory object
-        delta_slice = np.array(grid_delta_batch[:, :, :, i])
-        beta_slice = np.array(grid_beta_batch[:, :, :, i])
+        if repeating_slice is None:
+            delta_slice = np.array(grid_delta[:, :, :, i_slice])
+            beta_slice = np.array(grid_beta[:, :, :, i_slice])
+        else:
+            delta_slice = grid_delta[:, :, :, 0]
+            beta_slice = grid_beta[:, :, :, 0]
         t0 = time.time()
         c = np.exp(1j * k * delta_slice) * np.exp(-k * beta_slice)
         wavefront = wavefront * c
-        if i < n_slice - 1:
+        if i_slice < n_slice - 1:
             wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
         t_tot += (time.time() - t0)
 

@@ -101,7 +101,7 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         edge_val = sum(kernel.flatten() * edge_val)
         probe /= abs(edge_val)
         edge_val /= abs(edge_val)
-        # if rank == 8: dxchange.write_tiff(abs(probe), 'zp/size_4096/temp/tmp_{:03d}'.format(i_slice), overwrite=True, dtype='float32'); print(edge_val)
+        if rank == 8: dxchange.write_tiff(abs(probe), 'zp/size_4096/temp/tmp_{:03d}'.format(i_slice), overwrite=True, dtype='float32'); print(edge_val)
         t_tot += (time.time() - t0)
         # probe_array.append(np.abs(probe))
 
@@ -115,8 +115,8 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         else:
             dist_nm = free_prop_cm * 1e7
             l = np.prod(size_nm)**(1. / 3)
-            crit_samp = lmbda_nm * dist_nm / l
-            algorithm = 'TF' if mean_voxel_nm > crit_samp else 'IR'
+            crit_samp_dist = voxel_nm[0] * voxel_nm[1] * np.sqrt(np.prod(grid_shape[:2])) / lmbda_nm
+            algorithm = 'TF' if dist_nm < crit_samp_dist else 'IR'
             # print(algorithm)
             algorithm = 'TF'
             if algorithm == 'TF':

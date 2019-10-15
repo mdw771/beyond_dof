@@ -184,7 +184,7 @@ def get_kernel(dist_nm, lmbda_nm, voxel_nm, grid_shape):
 
     return H
 
-0
+
 def get_kernel_ir(dist_nm, lmbda_nm, voxel_nm, grid_shape):
 
     """
