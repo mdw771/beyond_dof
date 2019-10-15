@@ -111,7 +111,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         n_blocks_y = int(np.sqrt(float(n_ranks) * original_grid_shape[0] / original_grid_shape[1])) + 1
         n_blocks = n_blocks_x * n_blocks_y
         block_size = int(float(original_grid_shape[0]) / n_blocks_y) + 1
-        print(block_size, n_blocks_y, n_blocks_x, safe_zone_width)
 
         this_pos_ind_ls = range(rank, n_blocks, n_ranks)
         block_delta_batch = np.zeros([len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width, original_grid_shape[-1]])
@@ -134,8 +133,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                             :]
             sub_probe_real = probe_real[max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, original_grid_shape[0]), max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
             sub_probe_imag = probe_imag[max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, original_grid_shape[0]), max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
-
-            print(i_pos, sub_grid_delta.shape, 'before pad', line_st, line_end, px_st, px_end)
 
             # During padding, sub_grids are read into the RAM
             pad_top, pad_bottom, pad_left, pad_right = (0, 0, 0, 0)
