@@ -27,7 +27,7 @@ except:
     mpi_ok = False
 
 
-def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, original_grid_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
+def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, original_kernel_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
 
     """
     grid_delta and beta must be 4D arrays even if repeating_slice is not None (in which case the last dimension is 1).
@@ -40,10 +40,11 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     voxel_nm = np.array(psize_cm) * 1.e7
     delta_nm = voxel_nm[-1]
     k = 2. * np.pi * delta_nm / lmbda_nm
-    if original_grid_shape is not None:
-        grid_shape = np.array(original_grid_shape)
+    if original_kernel_shape is None:
+        original_kernel_shape = grid_delta.shape[1:3]
     else:
-        grid_shape = np.array(grid_delta.shape[1:])
+        original_kernel_shape = np.array(original_kernel_shape)
+    grid_shape = np.array(grid_delta.shape[1:])
     size_nm = voxel_nm * grid_shape
     mean_voxel_nm = np.prod(voxel_nm) ** (1. / 3)
 
@@ -53,8 +54,11 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         warnings.warn('Kernel size should be odd.')
     # kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, np.array(grid_delta.shape[1:]))
 
-    kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape - 1)
+    kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, original_kernel_shape - 1)
+    print(kernel.shape)
+
     kernel = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(kernel)))
+    dxchange.write_tiff(np.angle(kernel), 'zp/kernel_fft.tiff'.format(kernel_size), dtype='float32', overwrite=True)
 
     # kernel = get_kernel_ir_real(delta_nm, lmbda_nm, voxel_nm, grid_shape - 1)
     # dxchange.write_tiff(np.abs(kernel), 'test/kernel_abs', dtype='float32')
@@ -65,6 +69,7 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
     half_kernel_size = int((kernel_size - 1) / 2)
     kernel = kernel[kernel_mid[0] - half_kernel_size:kernel_mid[0] + half_kernel_size + 1,
                     kernel_mid[1] - half_kernel_size:kernel_mid[1] + half_kernel_size + 1]
+    dxchange.write_tiff(np.angle(kernel), 'zp/kernel_{}.tiff'.format(kernel_size), dtype='float32', overwrite=True)
     # kernel = get_kernel_ir_real(delta_nm, lmbda_nm, voxel_nm, [kernel_size, kernel_size, 256])
     # kernel /= kernel.size
     pad_len = (kernel_size - 1) // 2
@@ -101,7 +106,7 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         edge_val = sum(kernel.flatten() * edge_val)
         probe /= abs(edge_val)
         edge_val /= abs(edge_val)
-        if rank == 8: dxchange.write_tiff(abs(probe), 'zp/size_4096/temp/tmp_{:03d}'.format(i_slice), overwrite=True, dtype='float32'); print(edge_val)
+        if rank == 8: np.save('zp/size_4096/temp/tmp_{:03d}'.format(i_slice), probe);
         t_tot += (time.time() - t0)
         # probe_array.append(np.abs(probe))
 

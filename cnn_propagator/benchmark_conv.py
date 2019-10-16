@@ -73,7 +73,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         energy_ev = parameters['energy(in eV)']
         focal_len_m = parameters['focal_length']
         thick_zp_cm = 10e-4
-        kernel_size = 51
+        kernel_size = 59
         free_prop_cm = 0
         slice_spacing_cm = thick_zp_cm / n_slices
 
@@ -219,6 +219,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                                                  debug=False,
                                                  return_fft_time=True,
                                                  debug_save_path=debug_save_path,
+                                                 original_kernel_shape=original_grid_shape[:2],
                                                  rank=rank, t_init=0, verbose=verbose, starting_slice=0, repeating_slice=n_slices)
 
             t0 = time.time()

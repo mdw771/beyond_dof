@@ -59,7 +59,7 @@ n_repeats = 1
 if rank == 0:
     f = open(os.path.join(path_prefix, 'report_pfft.csv'), 'a')
     if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
-        f.write('algorithm,object_size,safezone_width,avg_working_time,avg_total_time,mse_with_fft\n')
+        f.write('algorithm,object_size,n_slices,safezone_width,avg_working_time,avg_total_time\n')
 
 # Benchmark partial FFT propagation
 for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
@@ -201,8 +201,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
         if rank == 0:
             print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_avg))
-            img = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'partial_fft_output.tiff'))
-            f.write('pfft,{},0,{},{},{},{}\n'.format(this_size, safe_zone_width, dt_avg, dt_tot_avg, np.mean((img - ref) ** 2)))
+            f.write('pfft,{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg))
             f.flush()
             os.fsync(f.fileno())
             i_starting_nslice += 1
