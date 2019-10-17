@@ -73,7 +73,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         energy_ev = parameters['energy(in eV)']
         focal_len_m = parameters['focal_length']
         thick_zp_cm = 10e-4
-        kernel_size = 59
+        kernel_size = 41
         free_prop_cm = 0
         slice_spacing_cm = thick_zp_cm / n_slices
 
@@ -220,7 +220,8 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                                                  return_fft_time=True,
                                                  debug_save_path=debug_save_path,
                                                  original_kernel_shape=original_grid_shape[:2],
-                                                 rank=rank, t_init=0, verbose=verbose, starting_slice=0, repeating_slice=n_slices)
+                                                 rank=rank, t_init=0, verbose=verbose, starting_slice=0, repeating_slice=n_slices,
+                                                 fade=20)
 
             t0 = time.time()
             this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')

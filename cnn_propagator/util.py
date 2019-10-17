@@ -95,10 +95,8 @@ def get_kernel(dist_nm, lmbda_nm, voxel_nm, grid_shape):
     v_max = 1. / (2. * voxel_nm[1])
     u, v = gen_mesh([v_max, u_max], grid_shape[0:2])
     # H = np.exp(1j * k * dist_nm * np.sqrt(1 - lmbda_nm**2 * (u**2 + v**2)))
-    try:
-        H = np.exp(1j * k * dist_nm) * np.exp(-1j * PI * lmbda_nm * dist_nm * (u**2 + v**2))
-    except:
-        H = tf.exp(1j * k * dist_nm) * tf.exp(-1j * PI * lmbda_nm * dist_nm * (u ** 2 + v ** 2))
+    # H = np.exp(1j * k * dist_nm) * np.exp(-1j * PI * lmbda_nm * dist_nm * (u**2 + v**2))
+    H = np.exp(-1j * 2 * PI * dist_nm / lmbda_nm * np.sqrt(1 - lmbda_nm ** 2 * (u**2 + v**2)))
 
     return H
 
@@ -115,14 +113,15 @@ def get_kernel_ir(dist_nm, lmbda_nm, voxel_nm, grid_shape):
     dist : float
         Propagation distance in cm.
     """
-    size_nm = np.array(voxel_nm) * np.array(grid_shape)
+    size_nm = np.array(voxel_nm)[:2] * np.array(grid_shape)[:2]
     k = 2 * PI / lmbda_nm
     ymin, xmin = np.array(size_nm)[:2] / -2.
     dy, dx = voxel_nm[0:2]
     x = np.arange(xmin, xmin + size_nm[1], dx)
     y = np.arange(ymin, ymin + size_nm[0], dy)
     x, y = np.meshgrid(x, y)
-    h = np.exp(1j * k * dist_nm) / (1j * lmbda_nm * dist_nm) * np.exp(1j * k / (2 * dist_nm) * (x ** 2 + y ** 2))
+    # h = np.exp(1j * k * dist_nm) / (1j * lmbda_nm * dist_nm) * np.exp(1j * k / (2 * dist_nm) * (x ** 2 + y ** 2))
+    h = np.exp(1j * k / (2 * dist_nm) * (x ** 2 + y ** 2))
     H = np.fft.fftshift(np.fft.fft2(h)) * voxel_nm[0] * voxel_nm[1]
 
     return H
@@ -140,7 +139,7 @@ def get_kernel_ir_real(dist_nm, lmbda_nm, voxel_nm, grid_shape):
     dist : float
         Propagation distance in cm.
     """
-    size_nm = np.array(voxel_nm) * np.array(grid_shape)
+    size_nm = np.array(voxel_nm)[:2] * np.array(grid_shape)[:2]
     k = 2 * PI / lmbda_nm
     y_half, x_half = (np.array(size_nm)[:2] - 1) / 2.
     dy, dx = voxel_nm[0:2]

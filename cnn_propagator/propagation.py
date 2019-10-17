@@ -11,6 +11,7 @@ import math
 import numpy as nnp
 from tqdm import trange
 from math import ceil, floor
+import sys
 
 from util import *
 
@@ -27,7 +28,10 @@ except:
     mpi_ok = False
 
 
-def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17, free_prop_cm=None, original_kernel_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
+def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, kernel_size=17,
+                             free_prop_cm=None, original_kernel_shape=None, return_fft_time=True, starting_slice=0,
+                             debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None,
+                             fade=20):
 
     """
     grid_delta and beta must be 4D arrays even if repeating_slice is not None (in which case the last dimension is 1).
@@ -54,22 +58,46 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         warnings.warn('Kernel size should be odd.')
     # kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, np.array(grid_delta.shape[1:]))
 
+    # kernel = get_kernel_ir_real(delta_nm, lmbda_nm, voxel_nm, original_kernel_shape - 1)
+    # kernel_mid = ((np.array(kernel.shape) - 1) / 2).astype('int')
+    # half_kernel_size = int((kernel_size - 1) / 2)
+    # kernel = kernel[kernel_mid[0] - half_kernel_size:kernel_mid[0] + half_kernel_size + 1,
+    #                 kernel_mid[1] - half_kernel_size:kernel_mid[1] + half_kernel_size + 1]
+    # dxchange.write_tiff(np.angle(kernel), 'zp/kernel_real.tiff'.format(kernel_size), dtype='float32', overwrite=True)
+    # dxchange.write_tiff(np.abs(kernel), 'zp/kernel_real_mag.tiff'.format(kernel_size), dtype='float32', overwrite=True)
+
+
     kernel = get_kernel(delta_nm, lmbda_nm, voxel_nm, original_kernel_shape - 1)
-    print(kernel.shape)
+    # kernel = np.pad(kernel, [[1024, 1024], [1024, 1024]])
+    # dxchange.write_tiff(np.angle(kernel), 'zp/kernel_pre_ifft.tiff'.format(kernel_size), dtype='float32', overwrite=True)
+    # dxchange.write_tiff(np.abs(kernel), 'zp/kernel_pre_ifft_mag.tiff'.format(kernel_size), dtype='float32', overwrite=True)
 
     kernel = np.fft.fftshift(np.fft.ifft2(np.fft.ifftshift(kernel)))
-    dxchange.write_tiff(np.angle(kernel), 'zp/kernel_fft.tiff'.format(kernel_size), dtype='float32', overwrite=True)
-
-    # kernel = get_kernel_ir_real(delta_nm, lmbda_nm, voxel_nm, grid_shape - 1)
-    # dxchange.write_tiff(np.abs(kernel), 'test/kernel_abs', dtype='float32')
-    # dxchange.write_tiff(np.angle(kernel), 'test/kernel_phase', dtype='float32')
-    # raise Exception
+    # kernel = kernel[1024:kernel.shape[0] - 1024, 1024:kernel.shape[0] - 1024]
+    # dxchange.write_tiff(np.angle(kernel), 'zp/kernel_fft.tiff'.format(kernel_size), dtype='float32', overwrite=True)
+    # dxchange.write_tiff(np.abs(kernel), 'zp/kernel_fft_mag.tiff'.format(kernel_size), dtype='float32', overwrite=True)
 
     kernel_mid = ((np.array(kernel.shape) - 1) / 2).astype('int')
     half_kernel_size = int((kernel_size - 1) / 2)
     kernel = kernel[kernel_mid[0] - half_kernel_size:kernel_mid[0] + half_kernel_size + 1,
                     kernel_mid[1] - half_kernel_size:kernel_mid[1] + half_kernel_size + 1]
-    dxchange.write_tiff(np.angle(kernel), 'zp/kernel_{}.tiff'.format(kernel_size), dtype='float32', overwrite=True)
+    kernel /= abs(kernel)
+
+    # dxchange.write_tiff(np.angle(kernel), 'zp/kernel_ifft.tiff'.format(kernel_size), dtype='float32', overwrite=True)
+    # dxchange.write_tiff(np.abs(kernel), 'zp/kernel_ifft_mag.tiff'.format(kernel_size), dtype='float32', overwrite=True)
+
+
+    if fade:
+        a = 1
+        x = np.arange(kernel.shape[1]) - (kernel.shape[1] - 1) / 2
+        y = np.arange(kernel.shape[0]) - (kernel.shape[0] - 1) / 2
+        xx, yy = np.meshgrid(x, y)
+        rr = np.sqrt(xx ** 2 + yy ** 2)
+        fade_mask = -rr / a + fade / a
+        fade_mask = np.clip(fade_mask, 0, 1)
+        kernel = kernel * fade_mask
+    dxchange.write_tiff(np.angle(kernel), '/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm_fade/kernel_{}_phase.tiff'.format(kernel_size, kernel_size), dtype='float32', overwrite=True)
+    dxchange.write_tiff(np.abs(kernel), '/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm_fade/kernel_{}_mag.tiff'.format(kernel_size, kernel_size), dtype='float32', overwrite=True)
     # kernel = get_kernel_ir_real(delta_nm, lmbda_nm, voxel_nm, [kernel_size, kernel_size, 256])
     # kernel /= kernel.size
     pad_len = (kernel_size - 1) // 2
@@ -106,7 +134,7 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         edge_val = sum(kernel.flatten() * edge_val)
         probe /= abs(edge_val)
         edge_val /= abs(edge_val)
-        if rank == 8: np.save('zp/size_4096/temp/tmp_{:03d}'.format(i_slice), probe);
+        if rank == 8: np.save('/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm_fade/tmp_{:03d}'.format(kernel_size, i_slice), probe);
         t_tot += (time.time() - t0)
         # probe_array.append(np.abs(probe))
 
