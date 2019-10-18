@@ -65,7 +65,7 @@ def multislice_propagate_batch_numpy(grid_delta_batch, grid_beta_batch, probe_re
 
 def multislice_propagate_spherical_numpy(grid_delta_batch, grid_beta_batch, probe_real, probe_imag, energy_ev, psize_cm,
                                          dist_to_source_cm, det_psize_cm, theta_max=PI/18, phi_max=PI/18, free_prop_cm=None,
-                                         obj_batch_shape=None):
+                                         fresnel_approx=False, obj_batch_shape=None):
 
     batch_size = obj_batch_shape[0]
     grid_shape = obj_batch_shape[1:]
@@ -201,7 +201,7 @@ def cartesian_to_spherical_numpy(arr, dist_to_source_nm, psize_nm, theta_max=PI/
     return arr_sph, (r_true, theta_true, phi_true)
 
 
-def fresnel_propagate_numpy(wavefront, energy_ev, psize_cm, dist_cm):
+def fresnel_propagate_numpy(wavefront, energy_ev, psize_cm, dist_cm, fresnel_approx=False):
 
     lmbda_nm = 1240. / energy_ev
     lmbda_cm = 0.000124 / energy_ev
@@ -215,7 +215,7 @@ def fresnel_propagate_numpy(wavefront, energy_ev, psize_cm, dist_cm):
         algorithm = 'TF' if dist_cm < z_crit_cm else 'IR'
         algorithm = 'TF'
         if algorithm == 'TF':
-            h = get_kernel(dist_nm, lmbda_nm, [psize_nm, psize_nm], wavefront.shape)
+            h = get_kernel(dist_nm, lmbda_nm, [psize_nm, psize_nm], wavefront.shape, fresnel_approx=fresnel_approx)
             wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront)) * h))
         else:
             h = get_kernel_ir(dist_nm, lmbda_nm, [psize_nm, psize_nm], wavefront.shape)

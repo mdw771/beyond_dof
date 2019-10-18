@@ -221,7 +221,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                                                  debug_save_path=debug_save_path,
                                                  original_kernel_shape=original_grid_shape[:2],
                                                  rank=rank, t_init=0, verbose=verbose, starting_slice=0, repeating_slice=n_slices,
-                                                 fade=20)
+                                                 fade=False)
 
             t0 = time.time()
             this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')

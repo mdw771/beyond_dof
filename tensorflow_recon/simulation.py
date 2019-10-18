@@ -78,7 +78,7 @@ def create_fullfield_data(energy_ev, psize_cm, free_prop_cm, n_theta, phantom_pa
 
 
 def create_fullfield_data_numpy(energy_ev, psize_cm, free_prop_cm, n_theta, phantom_path, save_folder, fname, batch_size=1,
-                                probe_type='plane', wavefront_initial=None, theta_st=0, theta_end=2*PI, monitor_output=False, **kwargs):
+                                probe_type='plane', wavefront_initial=None, theta_st=0, theta_end=2*PI, monitor_output=False, fresnel_approx=False, **kwargs):
 
     def rotate_and_project(this_theta_batch, obj):
         obj_rot_batch = []

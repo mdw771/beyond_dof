@@ -96,8 +96,8 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         fade_mask = -rr / a + fade / a
         fade_mask = np.clip(fade_mask, 0, 1)
         kernel = kernel * fade_mask
-    dxchange.write_tiff(np.angle(kernel), '/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm_fade/kernel_{}_phase.tiff'.format(kernel_size, kernel_size), dtype='float32', overwrite=True)
-    dxchange.write_tiff(np.abs(kernel), '/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm_fade/kernel_{}_mag.tiff'.format(kernel_size, kernel_size), dtype='float32', overwrite=True)
+    dxchange.write_tiff(np.angle(kernel), '/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm/kernel_{}_phase.tiff'.format(kernel_size, kernel_size), dtype='float32', overwrite=True)
+    dxchange.write_tiff(np.abs(kernel), '/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm/kernel_{}_mag.tiff'.format(kernel_size, kernel_size), dtype='float32', overwrite=True)
     # kernel = get_kernel_ir_real(delta_nm, lmbda_nm, voxel_nm, [kernel_size, kernel_size, 256])
     # kernel /= kernel.size
     pad_len = (kernel_size - 1) // 2
@@ -134,7 +134,7 @@ def multislice_propagate_cnn(grid_delta, grid_beta, probe_real, probe_imag, ener
         edge_val = sum(kernel.flatten() * edge_val)
         probe /= abs(edge_val)
         edge_val /= abs(edge_val)
-        if rank == 8: np.save('/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm_fade/tmp_{:03d}'.format(kernel_size, i_slice), probe);
+        if rank == 8: np.save('/data/programs/fdms_paper/factory/conv_failure/kernel_size_{}_ift_norm/tmp_{:03d}'.format(kernel_size, i_slice), probe);
         t_tot += (time.time() - t0)
         # probe_array.append(np.abs(probe))
 

@@ -162,7 +162,7 @@ def gen_mesh(max, shape):
     return res
 
 
-def get_kernel(dist_nm, lmbda_nm, voxel_nm, grid_shape):
+def get_kernel(dist_nm, lmbda_nm, voxel_nm, grid_shape, fresnel_approx=False):
     """Get Fresnel propagation kernel for TF algorithm.
 
     Parameters:
@@ -178,9 +178,15 @@ def get_kernel(dist_nm, lmbda_nm, voxel_nm, grid_shape):
     u, v = gen_mesh([v_max, u_max], grid_shape[0:2])
     # H = np.exp(1j * k * dist_nm * np.sqrt(1 - lmbda_nm**2 * (u**2 + v**2)))
     try:
-        H = np.exp(1j * k * dist_nm) * np.exp(-1j * PI * lmbda_nm * dist_nm * (u**2 + v**2))
+        if fresnel_approx:
+            H = np.exp(1j * k * dist_nm) * np.exp(-1j * PI * lmbda_nm * dist_nm * (u**2 + v**2))
+        else:
+            H = np.exp(-1j * 2 * PI * dist_nm / lmbda_nm * np.sqrt(1 - lmbda_nm ** 2 * (u ** 2 + v ** 2)))
     except:
-        H = tf.exp(1j * k * dist_nm) * tf.exp(-1j * PI * lmbda_nm * dist_nm * (u ** 2 + v ** 2))
+        if fresnel_approx:
+            H = tf.exp(1j * k * dist_nm) * tf.exp(-1j * PI * lmbda_nm * dist_nm * (u ** 2 + v ** 2))
+        else:
+            H = tf.exp(-1j * 2 * PI * dist_nm / lmbda_nm * tf.sqrt(1 - lmbda_nm ** 2 * (u ** 2 + v ** 2)))
 
     return H
 
