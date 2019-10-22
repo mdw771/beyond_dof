@@ -46,8 +46,8 @@ n_slices_ls = np.arange(10, 600, 5)
 # n_slices_ls = [50]
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
-    i_starting_size = cp['this_size_ind']
-    i_starting_nslice = cp['this_nslice_ind']
+    i_starting_size = int(cp[0])
+    i_starting_nslice = int(cp[1])
 except:
     i_starting_size = 0
     i_starting_nslice = 0
