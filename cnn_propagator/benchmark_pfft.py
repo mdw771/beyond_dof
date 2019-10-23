@@ -82,7 +82,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         # grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
         # grid_beta = np.reshape(grid_beta, [1, *grid_beta.shape])
         n_batch = 1
-        original_grid_shape = img.shape + [1]
+        original_grid_shape = [img.shape[0], img.shape[1], 1]
 
         size_factor = size_ls[-1] // this_size
         # psize_cm = psize_min_cm * size_factor
