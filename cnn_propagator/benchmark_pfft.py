@@ -1,14 +1,9 @@
 from mpi4py import MPI
 import dxchange
-import autograd.numpy as np
-import autograd.numpy.random as npr
-import autograd.scipy
-from autograd.scipy.signal import convolve
-from autograd import grad
 import time
 import warnings
 import math
-import numpy as nnp
+import numpy as np
 from tqdm import trange
 import sys
 import os
