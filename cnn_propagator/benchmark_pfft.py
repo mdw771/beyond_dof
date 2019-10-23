@@ -119,11 +119,11 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             sub_grid_delta = img[max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, original_grid_shape[0]),
                                  max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
             sub_grid_beta = img[max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, original_grid_shape[0]),
-                                 max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
+                                max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
             sub_grid_delta = np.reshape(sub_grid_delta, [1, *sub_grid_delta.shape, 1]) * delta
             sub_grid_beta = np.reshape(sub_grid_beta, [1, *sub_grid_beta.shape, 1]) * beta
             sub_probe_real = np.ones(sub_grid_delta.shape[1:3])
-            sub_probe_imag = np.ones(sub_grid_delta.shape[1:3])
+            sub_probe_imag = np.zeros(sub_grid_delta.shape[1:3])
 
             # During padding, sub_grids are read into the RAM
             pad_top, pad_bottom, pad_left, pad_right = (0, 0, 0, 0)
