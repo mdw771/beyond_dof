@@ -74,7 +74,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         if rank == 0: print('This size is {}. This n_slices is {}'.format(this_size, n_slices))
         img = np.load(os.path.join(path_prefix, 'size_{}', 'zp.npy').format(this_size), mmap_mode='r')
         img_shape = img.shape
-        img = np.reshape(img, [1, *img_shape, 1])
         # grid_delta = np.ones([1, *img_shape, 1]) * img * delta
         # grid_beta = np.ones([1, *img_shape, 1]) * img * beta
         # grid_delta = np.swapaxes(np.swapaxes(grid_delta, 0, 1), 1, 2)
@@ -90,11 +89,11 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         ref = dxchange.read_tiff(
             os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
-        # safe_zone_width = ceil(
-        #     4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
-        z_nm = slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7
-        safe_zone_width = np.sqrt(z_nm ** 2 / (4 * (psize_cm * 1e7) ** 2 / lmbda_nm ** 2 - 1))
-        safe_zone_width = ceil(1.1 * safe_zone_width)
+        safe_zone_width = ceil(
+            4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
+        # z_nm = slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7
+        # safe_zone_width = np.sqrt(z_nm ** 2 / (4 * (psize_cm * 1e7) ** 2 / lmbda_nm ** 2 - 1))
+        # safe_zone_width = ceil(1.1 * safe_zone_width)
         if rank == 0: print('  Safe zone width is {}.'.format(safe_zone_width))
 
         # Must satisfy:
