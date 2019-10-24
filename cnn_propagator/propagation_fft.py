@@ -1,9 +1,9 @@
-import autograd.numpy as np
+import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from autograd.numpy.fft import fft2, ifft2
-from autograd.numpy.fft import fftshift as np_fftshift
-from autograd.numpy.fft import ifftshift as np_ifftshift
+from numpy.fft import fft2, ifft2
+from numpy.fft import fftshift as np_fftshift
+from numpy.fft import ifftshift as np_ifftshift
 from scipy.interpolate import RegularGridInterpolator
 from util import get_kernel, get_kernel_ir
 from constants import *

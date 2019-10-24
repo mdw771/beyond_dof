@@ -2,7 +2,7 @@ import dxchange
 import h5py
 import matplotlib.pyplot as plt
 import matplotlib
-import autograd.numpy as np
+import numpy as np
 
 import warnings
 try:

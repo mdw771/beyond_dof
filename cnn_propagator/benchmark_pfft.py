@@ -9,7 +9,6 @@ import sys
 import os
 import pickle
 from math import ceil, floor
-from propagation import multislice_propagate_cnn
 from propagation_fft import multislice_propagate_batch_numpy
 
 
