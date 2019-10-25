@@ -47,6 +47,7 @@ except:
     i_starting_nslice = 0
 #####################################################################
 n_repeats = 1
+verbose = True if rank == 0 else False
 
 # Create report
 if rank == 0:
@@ -159,7 +160,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                                                              [psize_cm, psize_cm, slice_spacing_cm], obj_batch_shape=block_delta_batch.shape,
                                                              return_fft_time=True, starting_slice=0, t_init=0,
                                                              debug=False, debug_save_path=None,
-                                                             rank=rank, verbose=True, repeating_slice=n_slices)
+                                                             rank=rank, verbose=verbose, repeating_slice=n_slices)
 
             t0 = time.time()
             if rank != 0:
@@ -167,12 +168,14 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             if rank == 0:
                 this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')
                 block_ls = [wavefield]
+                # Receive wavefield stacks from other ranks
                 for i_src_rank in range(1, n_ranks):
-                    src_pos_rank = range(i_src_rank, n_blocks, n_ranks)
+                    n_src_rank_stack = len(range(i_src_rank, n_blocks, n_ranks))
                     this_block = np.zeros([n_src_rank_stack, *wavefield.shape[1:]], dtype=np.complex64)
                     comm.Recv(this_block, source=source_rank, tag=1)
                     block_ls.append(this_block)
-                for i_stack, block_stack in enumerate(block_ls):
+                # Build full wavefront on rank 0
+                for i_src_rank, block_stack in enumerate(block_ls):
                     pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
                     for ind, i_pos in enumerate(pos_ind_ls):
                         line_st = i_pos // n_blocks_x * block_size
