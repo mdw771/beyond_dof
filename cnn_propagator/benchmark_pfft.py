@@ -164,38 +164,48 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
             t0 = time.time()
             if rank != 0:
-                comm.Send(wavefield.real, dest=0, tag=1)
-                comm.Send(wavefield.imag, dest=0, tag=2)
-                print(wavefield.real.shape, rank)
+                # comm.Send(wavefield.real, dest=0, tag=1)
+                # comm.Send(wavefield.imag, dest=0, tag=2)
+                comm.Send(wavefield, dest=0, tag=1)
             if rank == 0:
                 full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex)
-                block_ls_real = [wavefield.real]
-                block_ls_imag = [wavefield.imag]
+                # block_ls_real = [wavefield.real]
+                # block_ls_imag = [wavefield.imag]
+                block_ls = [wavefield]
                 # Receive wavefield stacks from other ranks
                 for i_src_rank in range(1, n_ranks):
                     n_src_rank_stack = len(range(i_src_rank, n_blocks, n_ranks))
-                    this_block_real = np.zeros([n_src_rank_stack, *wavefield.shape[1:]])
-                    this_block_imag = np.zeros([n_src_rank_stack, *wavefield.shape[1:]])
+                    # this_block_real = np.zeros([n_src_rank_stack, *wavefield.shape[1:]])
+                    # this_block_imag = np.zeros([n_src_rank_stack, *wavefield.shape[1:]])
+                    this_block = np.zeros([n_src_rank_stack, *wavefield.shape[1:]])
                     try:
-                        print(this_block_real.shape, i_src_rank)
-                        comm.Recv(this_block_imag, source=i_src_rank, tag=2)
-                        comm.Recv(this_block_real, source=i_src_rank, tag=1)
+                        # comm.Recv(this_block_imag, source=i_src_rank, tag=2)
+                        # comm.Recv(this_block_real, source=i_src_rank, tag=1)
+                        comm.Recv(this_block, source=i_src_rank, tag=1)
                     except:
                         pass
-                    block_ls_real.append(this_block_real)
-                    block_ls_imag.append(this_block_imag)
+                    # block_ls_real.append(this_block_real)
+                    # block_ls_imag.append(this_block_imag)
+                    block_ls.append(this_block)
+                    print(this_block)
+                    # dxchange.write_tiff(this_block, 'zp/size_256/this_block', dtype='float32')
                 # Build full wavefront on rank 0
-                for i_src_rank in range(len(block_ls_real)):
+                # for i_src_rank in range(len(block_ls_real)):
+                for i_src_rank in range(len(block_ls)):
                     pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
                     for ind, i_pos in enumerate(pos_ind_ls):
+
                         line_st = i_pos // n_blocks_x * block_size
                         line_end = min([line_st + block_size, original_grid_shape[0]])
                         px_st = i_pos % n_blocks_x * block_size
                         px_end = min([px_st + block_size, original_grid_shape[1]])
-                        full_wavefield[0, line_st:line_end, px_st:px_end] += block_ls_real[i_src_rank][ind,
-                                                                                 safe_zone_width:safe_zone_width + (line_end - line_st),
-                                                                                 safe_zone_width:safe_zone_width + (px_end - px_st)]
-                        full_wavefield[0, line_st:line_end, px_st:px_end] += 1j * block_ls_imag[i_src_rank][ind,
+                        # full_wavefield[0, line_st:line_end, px_st:px_end] += block_ls_real[i_src_rank][ind,
+                        #                                                          safe_zone_width:safe_zone_width + (line_end - line_st),
+                        #                                                          safe_zone_width:safe_zone_width + (px_end - px_st)]
+                        # full_wavefield[0, line_st:line_end, px_st:px_end] += 1j * block_ls_imag[i_src_rank][ind,
+                        #                                                          safe_zone_width:safe_zone_width + (line_end - line_st),
+                        #                                                          safe_zone_width:safe_zone_width + (px_end - px_st)]
+                        full_wavefield[0, line_st:line_end, px_st:px_end] += block_ls[i_src_rank][ind,
                                                                                  safe_zone_width:safe_zone_width + (line_end - line_st),
                                                                                  safe_zone_width:safe_zone_width + (px_end - px_st)]
                 dt += time.time() - t0
