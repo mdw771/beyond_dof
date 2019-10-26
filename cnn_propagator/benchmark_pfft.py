@@ -34,10 +34,10 @@ def save_checkpoint(this_size_ind, this_nslice_ind):
 
 path_prefix = os.path.join(os.getcwd(), 'zp')
 ######################################################################
-size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-n_slices_ls = np.arange(10, 600, 5)
-# size_ls = [4096]
-# n_slices_ls = [50]
+# size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
+# n_slices_ls = np.arange(10, 600, 5)
+size_ls = [256]
+n_slices_ls = [10]
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
     i_starting_size = int(cp[0])
@@ -164,25 +164,38 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
             t0 = time.time()
             if rank != 0:
-                comm.Send(wavefield, dest=0, tag=1)
+                comm.Send(wavefield.real, dest=0, tag=1)
+                comm.Send(wavefield.imag, dest=0, tag=2)
+                print(wavefield.real.shape, rank)
             if rank == 0:
-                this_full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype='complex64')
-                block_ls = [wavefield]
+                full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex)
+                block_ls_real = [wavefield.real]
+                block_ls_imag = [wavefield.imag]
                 # Receive wavefield stacks from other ranks
                 for i_src_rank in range(1, n_ranks):
                     n_src_rank_stack = len(range(i_src_rank, n_blocks, n_ranks))
-                    this_block = np.zeros([n_src_rank_stack, *wavefield.shape[1:]], dtype=np.complex64)
-                    comm.Recv(this_block, source=i_src_rank, tag=1)
-                    block_ls.append(this_block)
+                    this_block_real = np.zeros([n_src_rank_stack, *wavefield.shape[1:]])
+                    this_block_imag = np.zeros([n_src_rank_stack, *wavefield.shape[1:]])
+                    try:
+                        print(this_block_real.shape, i_src_rank)
+                        comm.Recv(this_block_imag, source=i_src_rank, tag=2)
+                        comm.Recv(this_block_real, source=i_src_rank, tag=1)
+                    except:
+                        pass
+                    block_ls_real.append(this_block_real)
+                    block_ls_imag.append(this_block_imag)
                 # Build full wavefront on rank 0
-                for i_src_rank, block_stack in enumerate(block_ls):
+                for i_src_rank in range(len(block_ls_real)):
                     pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
                     for ind, i_pos in enumerate(pos_ind_ls):
                         line_st = i_pos // n_blocks_x * block_size
                         line_end = min([line_st + block_size, original_grid_shape[0]])
                         px_st = i_pos % n_blocks_x * block_size
                         px_end = min([px_st + block_size, original_grid_shape[1]])
-                        this_full_wavefield[0, line_st:line_end, px_st:px_end] = block_stack[ind,
+                        full_wavefield[0, line_st:line_end, px_st:px_end] += block_ls_real[i_src_rank][ind,
+                                                                                 safe_zone_width:safe_zone_width + (line_end - line_st),
+                                                                                 safe_zone_width:safe_zone_width + (px_end - px_st)]
+                        full_wavefield[0, line_st:line_end, px_st:px_end] += 1j * block_ls_imag[i_src_rank][ind,
                                                                                  safe_zone_width:safe_zone_width + (line_end - line_st),
                                                                                  safe_zone_width:safe_zone_width + (px_end - px_st)]
                 dt += time.time() - t0
