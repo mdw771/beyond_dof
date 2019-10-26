@@ -172,7 +172,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                 for i_src_rank in range(1, n_ranks):
                     n_src_rank_stack = len(range(i_src_rank, n_blocks, n_ranks))
                     this_block = np.zeros([n_src_rank_stack, *wavefield.shape[1:]], dtype=np.complex64)
-                    comm.Recv(this_block, source=source_rank, tag=1)
+                    comm.Recv(this_block, source=i_src_rank, tag=1)
                     block_ls.append(this_block)
                 # Build full wavefront on rank 0
                 for i_src_rank, block_stack in enumerate(block_ls):
