@@ -111,7 +111,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         n_blocks_x = int(np.sqrt(original_grid_shape[1] / original_grid_shape[0] * n_ranks))
         n_blocks = n_blocks_x * n_blocks_y
         block_size = ceil(max([original_grid_shape[0] / n_blocks_y, original_grid_shape[1] / n_blocks_x]))
-        print(block_size)
         this_pos_ind_ls = range(rank, n_blocks, n_ranks)
         block_delta_batch = np.zeros(
             [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width,
