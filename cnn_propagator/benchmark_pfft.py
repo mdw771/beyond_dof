@@ -193,7 +193,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                     except:
                         pass
                     block_ls.append(this_block)
-                    print(this_block)
                 # Build full wavefront on rank 0
                 for i_src_rank in range(len(block_ls)):
                     pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
