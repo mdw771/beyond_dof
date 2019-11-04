@@ -11,7 +11,7 @@ import pickle
 from math import ceil, floor
 from propagation_fft import multislice_propagate_batch_numpy
 
-t_limit = 170
+t_limit = 330
 t_zero = time.time()
 
 try:
@@ -211,12 +211,12 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                 dt_ls[i, 1] = time.time() - t_tot_0
 
                 if i == 0:
-                    dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                                                          'pfft_nslices_{}_output.tiff'.format(
-                                                                              n_slices)), dtype='float32',
-                                        overwrite=True)
+                    # dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size),
+                    #                                                       'pfft_nslices_{}_output.tiff'.format(
+                    #                                                           n_slices)), dtype='float32',
+                    #                     overwrite=True)
                     np.save(os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                         'pfft_nslices_{}_output'.format(n_slices)), full_wavefield)
+                                         'pfft_nslices_{}_output'.format(n_slices)), np.squeeze(full_wavefield))
                 # if rank == 0:
                 #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
             comm.Barrier()
