@@ -186,9 +186,9 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
             if hdf5:
                 f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                              'pfft_nslices_{}_output'.format(n_slices)),
+                                              'pfft_nslices_{}_output.h5'.format(n_slices)),
                                   'w', driver='mpio', comm=comm)
-                dset = f_out.create_dataset('wavefield', *original_grid_shape[:-1], dtype='complex64')
+                dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
                 pos_ind_ls = range(rank, n_blocks, n_ranks)
                 for ind, i_pos in enumerate(pos_ind_ls):
                     line_st = i_pos // n_blocks_x * block_size
