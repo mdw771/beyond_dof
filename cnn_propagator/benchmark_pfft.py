@@ -35,10 +35,10 @@ def save_checkpoint(this_size_ind, this_nslice_ind):
 
 path_prefix = os.path.join(os.getcwd(), 'zp')
 ######################################################################
-# size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-# n_slices_ls = np.arange(10, 600, 5)
-size_ls = [256]
-n_slices_ls = [10]
+size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
+n_slices_ls = np.arange(10, 600, 5)
+# size_ls = [256]
+# n_slices_ls = [10]
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
     i_starting_size = int(cp[0])
