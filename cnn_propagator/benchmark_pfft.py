@@ -4,6 +4,7 @@ import time
 import warnings
 import math
 import numpy as np
+import h5py
 from tqdm import trange
 import sys
 import os
@@ -13,6 +14,7 @@ from propagation_fft import multislice_propagate_batch_numpy
 
 t_limit = 330
 t_zero = time.time()
+hdf5 = True
 
 try:
     comm = MPI.COMM_WORLD
@@ -181,36 +183,55 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
             t0 = time.time()
             dt_prop = t0 - t_tot_0
-            block_ls = comm.gather(wavefield, root=0)
 
-            if rank == 0:
-                full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex64)
-                for i_src_rank in range(len(block_ls)):
-                    pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
-                    for ind, i_pos in enumerate(pos_ind_ls):
-                        line_st = i_pos // n_blocks_x * block_size
-                        line_end = min([line_st + block_size, original_grid_shape[0]])
-                        px_st = i_pos % n_blocks_x * block_size
-                        px_end = min([px_st + block_size, original_grid_shape[1]])
-                        full_wavefield[0, line_st:line_end, px_st:px_end] += block_ls[i_src_rank][ind,
-                                                                             safe_zone_width:safe_zone_width + (
-                                                                                         line_end - line_st),
-                                                                             safe_zone_width:safe_zone_width + (
-                                                                                         px_end - px_st)]
+            if hdf5:
+                f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
+                                              'pfft_nslices_{}_output'.format(n_slices)),
+                                  'w', driver='mpio', comm=comm)
+                dset = f_out.create_dataset('wavefield', *original_grid_shape[:-1], dtype='complex64')
+                pos_ind_ls = range(rank, n_blocks, n_ranks)
+                for ind, i_pos in enumerate(pos_ind_ls):
+                    line_st = i_pos // n_blocks_x * block_size
+                    line_end = min([line_st + block_size, original_grid_shape[0]])
+                    px_st = i_pos % n_blocks_x * block_size
+                    px_end = min([px_st + block_size, original_grid_shape[1]])
+                    dset[line_st:line_end, px_st:px_end] += wavefield[ind,
+                                                                      safe_zone_width:safe_zone_width + (line_end - line_st),
+                                                                      safe_zone_width:safe_zone_width + (px_end - px_st)]
+                f_out.close()
                 dt += time.time() - t0
                 dt_ls[i, 0] = dt
                 dt_ls[i, 1] = time.time() - t_tot_0
+            else:
+                block_ls = comm.gather(wavefield, root=0)
+                if rank == 0:
+                    full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex64)
+                    for i_src_rank in range(len(block_ls)):
+                        pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
+                        for ind, i_pos in enumerate(pos_ind_ls):
+                            line_st = i_pos // n_blocks_x * block_size
+                            line_end = min([line_st + block_size, original_grid_shape[0]])
+                            px_st = i_pos % n_blocks_x * block_size
+                            px_end = min([px_st + block_size, original_grid_shape[1]])
+                            full_wavefield[0, line_st:line_end, px_st:px_end] += block_ls[i_src_rank][ind,
+                                                                                 safe_zone_width:safe_zone_width + (
+                                                                                             line_end - line_st),
+                                                                                 safe_zone_width:safe_zone_width + (
+                                                                                             px_end - px_st)]
+                    dt += time.time() - t0
+                    dt_ls[i, 0] = dt
+                    dt_ls[i, 1] = time.time() - t_tot_0
 
-                if i == 0:
-                    # dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size),
-                    #                                                       'pfft_nslices_{}_output.tiff'.format(
-                    #                                                           n_slices)), dtype='float32',
-                    #                     overwrite=True)
-                    np.save(os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                         'pfft_nslices_{}_output'.format(n_slices)), np.squeeze(full_wavefield))
-                # if rank == 0:
-                #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
-            comm.Barrier()
+                    if i == 0:
+                        # dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size),
+                        #                                                       'pfft_nslices_{}_output.tiff'.format(
+                        #                                                           n_slices)), dtype='float32',
+                        #                     overwrite=True)
+                        np.save(os.path.join(path_prefix, 'size_{}'.format(this_size),
+                                             'pfft_nslices_{}_output'.format(n_slices)), np.squeeze(full_wavefield))
+                    # if rank == 0:
+                    #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
+                comm.Barrier()
 
         if rank == 0:
             dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
