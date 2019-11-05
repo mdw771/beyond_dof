@@ -35,10 +35,10 @@ def save_checkpoint(this_size_ind, this_nslice_ind):
 
 path_prefix = os.path.join(os.getcwd(), 'zp')
 ######################################################################
-size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-n_slices_ls = np.arange(10, 600, 5)
-# size_ls = [256]
-# n_slices_ls = [10]
+# size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
+# n_slices_ls = np.arange(10, 600, 5)
+size_ls = [256]
+n_slices_ls = [10]
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
     i_starting_size = int(cp[0])
@@ -54,7 +54,7 @@ verbose = True if rank == 0 else False
 if rank == 0:
     f = open(os.path.join(path_prefix, 'report_pfft.csv'), 'a')
     if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
-        f.write('algorithm,object_size,n_slices,safezone_width,avg_working_time,avg_total_time\n')
+        f.write('algorithm,object_size,n_slices,safezone_width,avg_working_time,avg_total_time,propagation_time\n')
 
 # Benchmark partial FFT propagation
 for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
@@ -180,10 +180,11 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                                                              rank=rank, verbose=verbose, repeating_slice=n_slices)
 
             t0 = time.time()
+            dt_prop = t0 - t_tot_0
             if rank != 0:
                 comm.send(wavefield, dest=0, tag=1)
             if rank == 0:
-                full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex)
+                full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex64)
                 block_ls = [wavefield]
                 # Receive wavefield stacks from other ranks
                 for i_src_rank in range(1, n_ranks):
@@ -224,7 +225,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         if rank == 0:
             dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
             print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_avg))
-            f.write('pfft,{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg))
+            f.write('pfft,{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg, dt_prop))
             f.flush()
             os.fsync(f.fileno())
             i_starting_nslice += 1
