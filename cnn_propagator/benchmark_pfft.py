@@ -181,20 +181,10 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
             t0 = time.time()
             dt_prop = t0 - t_tot_0
-            if rank != 0:
-                comm.send(wavefield, dest=0, tag=1)
+            block_ls = comm.gather(wavefield, root=0)
+
             if rank == 0:
                 full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex64)
-                block_ls = [wavefield]
-                # Receive wavefield stacks from other ranks
-                for i_src_rank in range(1, n_ranks):
-                    n_src_rank_stack = len(range(i_src_rank, n_blocks, n_ranks))
-                    try:
-                        this_block = comm.recv(source=i_src_rank, tag=1)
-                    except:
-                        pass
-                    block_ls.append(this_block)
-                # Build full wavefront on rank 0
                 for i_src_rank in range(len(block_ls)):
                     pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
                     for ind, i_pos in enumerate(pos_ind_ls):
