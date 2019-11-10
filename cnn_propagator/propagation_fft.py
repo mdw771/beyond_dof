@@ -13,7 +13,7 @@ import time
 
 from util import *
 
-def multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
+def multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, h=None, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
 
     minibatch_size = obj_batch_shape[0]
     voxel_nm = np.array(psize_cm) * 1.e7
@@ -34,7 +34,9 @@ def multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_im
     delta_nm = voxel_nm[-1]
 
     # h = get_kernel_ir(delta_nm, lmbda_nm, voxel_nm, grid_shape)
-    h = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape)
+    if h is None:
+        h = get_kernel(delta_nm, lmbda_nm, voxel_nm, grid_shape)
+
     k = 2. * PI * delta_nm / lmbda_nm
 
     t_tot = t_init
