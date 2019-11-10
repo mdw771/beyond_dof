@@ -51,10 +51,10 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
     if np.ceil(this_slice_ind) - this_slice_ind < 1e-3: # If this_slice_ind is an integer itself
         pass
     else:
-        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'delta_{:05}.tiff'.format(int(this_slice_ind))))
-        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'beta_{:05}.tiff'.format(int(this_slice_ind))))
-        next_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'delta_{:05}.tiff'.format(int(this_slice_ind) + 1)))
-        next_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'beta_{:05}.tiff'.format(int(this_slice_ind) + 1)))
+        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(int(this_slice_ind))))
+        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(int(this_slice_ind))))
+        next_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(int(this_slice_ind) + 1)))
+        next_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(int(this_slice_ind) + 1)))
         if slc is not None:
             this_delta_slice = this_delta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
             this_beta_slice = this_beta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
@@ -66,8 +66,8 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
         beta_slice += this_beta_slice * (np.ceil(this_slice_ind) - this_slice_ind)
         this_slice_ind = np.ceil(this_slice_ind)
     while this_slice_ind + 1 <= next_slice_ind:
-        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'delta_{:05}.tiff'.format(int(this_slice_ind))))
-        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'beta_{:05}.tiff'.format(int(this_slice_ind))))
+        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(int(this_slice_ind))))
+        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(int(this_slice_ind))))
         if slc is not None:
             this_delta_slice = this_delta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
             this_beta_slice = this_beta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
@@ -75,10 +75,10 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
         beta_slice += this_beta_slice
         this_slice_ind += 1
     if next_slice_ind - this_slice_ind > 1e-3:
-        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'delta_{:05}.tiff'.format(int(this_slice_ind))))
-        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'beta_{:05}.tiff'.format(int(this_slice_ind))))
-        next_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'delta_{:05}.tiff'.format(int(this_slice_ind) + 1)))
-        next_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'beta_{:05}.tiff'.format(int(this_slice_ind) + 1)))
+        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(int(this_slice_ind))))
+        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(int(this_slice_ind))))
+        next_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(int(this_slice_ind) + 1)))
+        next_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(int(this_slice_ind) + 1)))
         if slc is not None:
             this_delta_slice = this_delta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
             this_beta_slice = this_beta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
