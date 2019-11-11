@@ -148,11 +148,11 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             pad_top, pad_bottom, pad_left, pad_right = (0, 0, 0, 0)
             if line_st < safe_zone_width:
                 pad_top = safe_zone_width - line_st
-            if (original_grid_shape[0] - line_end + 1) < safe_zone_width:
+            if (original_grid_shape[0] - line_end) < safe_zone_width:
                 pad_bottom = line_end + safe_zone_width - original_grid_shape[0]
             if px_st < safe_zone_width:
                 pad_left = safe_zone_width - px_st
-            if (original_grid_shape[1] - px_end + 1) < safe_zone_width:
+            if (original_grid_shape[1] - px_end) < safe_zone_width:
                 pad_right = px_end + safe_zone_width - original_grid_shape[1]
             sub_grid_delta = np.pad(sub_grid_delta, [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
                                     mode='edge')
