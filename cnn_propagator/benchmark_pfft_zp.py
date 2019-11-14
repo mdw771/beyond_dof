@@ -182,8 +182,8 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                                                              debug=False, debug_save_path=None,
                                                              rank=rank, verbose=verbose, repeating_slice=n_slices)
 
+            dt_prop = dt
             t0 = time.time()
-            dt_prop = t0 - t_tot_0
 
             if hdf5:
                 f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
@@ -237,7 +237,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         if rank == 0:
             dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
             print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_avg))
-            f.write('pfft,{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg, dt_prop))
+            f.write('pfft,{},{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_avg, dt_tot_avg, dt_prop))
             f.flush()
             os.fsync(f.fileno())
             i_starting_nslice += 1

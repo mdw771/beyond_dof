@@ -251,13 +251,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                 block_beta_batch[ind] = sub_grid_beta
 
 
-
-
-            if rank == 0: dxchange.write_tiff(np.squeeze(block_delta_batch), 'charcoal/size_4096/delta.tiff', dtype='float32')
-            if rank == 0: dxchange.write_tiff(np.squeeze(block_beta_batch), 'charcoal/size_4096/beta.tiff', dtype='float32')
-
-
-
             wavefield, dt = multislice_propagate_batch_numpy(block_delta_batch, block_beta_batch,
                                                              block_probe_real_batch, block_probe_imag_batch, energy_ev,
                                                              [psize_cm, psize_cm, slice_spacing_cm],
@@ -268,15 +261,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                                                              rank=rank, verbose=False, repeating_slice=1)
             block_probe_real_batch[:, :, :] = wavefield.real
             block_probe_imag_batch[:, :, :] = wavefield.imag
-
-
-
-
-            if rank == 0: dxchange.write_tiff(abs(np.squeeze(wavefield)), 'charcoal/size_4096/wave.tiff',
-                                              dtype='float32')
-
-
-
 
             t0 = time.time()
             dt_prop += dt

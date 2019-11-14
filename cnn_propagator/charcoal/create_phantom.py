@@ -16,6 +16,7 @@ def build_panorama(file_grid, shift_grid, tile, frame=0, method='max', method2=N
     last_none = False
     if method2 is None:
         for (y, x), _ in np.ndenumerate(file_grid):
+            print(y, x)
             buff = blend(buff, np.squeeze(tile), shift_grid[y, x, :], method=method, color_correction=color_correction, **blend_options)
             if last_none:
                 buff[margin:, margin:-margin][np.isnan(buff[margin:, margin:-margin])] = 0
@@ -48,7 +49,9 @@ beta = xommons.ri_beta('Au', 5, 19.3)
 
 tile_size = 2048
 ########################################################################
-tile_grid = [16] * 2
+tile_grid = [8] * 2
+interval = 50
+n_slices = 51
 ########################################################################
 img_size = [tile_size * i for i in tile_grid]
 roi_lt_corner = (2232, 3510)
@@ -61,7 +64,7 @@ dest_folder = 'size_{}/phamtom'.format(img_size[0])
 
 src_img_list = glob(os.path.join(src_folder, 'recon_*.tiff'))
 src_img_list.sort()
-src_img_list = src_img_list[184:]
+src_img_list = src_img_list[184:184 + interval * n_slices:interval]
 
 file_grid = np.ones(tile_grid)
 shift_grid = tomosaic.start_shift_grid(file_grid, tile_size, tile_size)
@@ -80,6 +83,5 @@ for i, src_img in tqdm(enumerate(src_img_list[rank:len(src_img_list):n_ranks]), 
     slice[:, -empty_len:] = 0
     slice /= dc
     slice[slice < 0] = 0
-    dxchange.write_tiff(slice * delta, os.path.join(dest_folder, 'delta_{:05d}'.format(ind)), overwrite=True, dtype='float32')
-    dxchange.write_tiff(slice * beta, os.path.join(dest_folder, 'beta_{:05d}'.format(ind)), overwrite=True, dtype='float32')
+    dxchange.write_tiff(slice, os.path.join(dest_folder, 'img_{:05d}'.format(i)), overwrite=True, dtype='float32')
 
