@@ -49,51 +49,45 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
     this_slice_ind = slice_ind_ls[i_slice] # Say, 2.5
     final_slice_ind = slice_ind_ls[i_slice + 1] if i_slice + 1 < n_slices else slice_ls[i_slice] # Say, 5
     shape = [slc[0][1] - slc[0][0], slc[1][1] - slc[1][0]]
-    delta_slice = np.zeros(shape)
-    beta_slice = np.zeros(shape)
+    ri_slice = np.zeros(shape)
+    total_dist = final_slice_ind - this_slice_ind
+    # if rank == 0:
+    #     print('slice_full_ls', slice_full_ls)
+    #     print('slice_ind_ls', slice_ind_ls)
+    #     print('slice_ls', slice_ls)
+    #     print('this_slice_ind', this_slice_ind)
+    #     print('final_slice_ind', final_slice_ind)
+
     if np.ceil(this_slice_ind) - this_slice_ind < 1e-3: # If this_slice_ind is an integer itself
         pass
     else:
-        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
-        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
-        next_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind) + 1])))
-        next_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind) + 1])))
+        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
+        next_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind) + 1])))
         if slc is not None:
-            this_delta_slice = this_delta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            this_beta_slice = this_beta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            next_delta_slice = next_delta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            next_beta_slice = next_beta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-        this_delta_slice = (np.ceil(this_slice_ind) - this_slice_ind) * this_delta_slice + (this_slice_ind - np.floor(this_slice_ind)) * next_delta_slice
-        this_beta_slice = (np.ceil(this_slice_ind) - this_slice_ind) * this_beta_slice + (this_slice_ind - np.floor(this_slice_ind)) * next_beta_slice
-        delta_slice += this_delta_slice * (np.ceil(this_slice_ind) - this_slice_ind)
-        beta_slice += this_beta_slice * (np.ceil(this_slice_ind) - this_slice_ind)
+            this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
+            next_ri_slice = next_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
+        this_ri_slice = (np.ceil(this_slice_ind) - this_slice_ind) * this_ri_slice + (this_slice_ind - np.floor(this_slice_ind)) * next_ri_slice
+        ri_slice += this_ri_slice * (np.ceil(this_slice_ind) - this_slice_ind)
         this_slice_ind = np.ceil(this_slice_ind)
     while this_slice_ind + 1 <= final_slice_ind:
-        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
-        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
+        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
         if slc is not None:
-            this_delta_slice = this_delta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            this_beta_slice = this_beta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-        delta_slice += this_delta_slice
-        beta_slice += this_beta_slice
+            this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
+        ri_slice += this_ri_slice
         this_slice_ind += 1
     if final_slice_ind - this_slice_ind > 1e-3:
         final_slice_ind_ceil = int(np.min([np.ceil(final_slice_ind), n_slices_max - 1]))
-        this_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
-        this_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
-        next_delta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'delta_{:05}.tiff'.format(slice_full_ls[final_slice_ind_ceil])))
-        next_beta_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'beta_{:05}.tiff'.format(slice_full_ls[final_slice_ind_ceil])))
+        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
+        next_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[final_slice_ind_ceil])))
         if slc is not None:
-            this_delta_slice = this_delta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            this_beta_slice = this_beta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            next_delta_slice = next_delta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            next_beta_slice = next_beta_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-        this_delta_slice = (np.ceil(final_slice_ind) - final_slice_ind) * this_delta_slice + (final_slice_ind - np.floor(final_slice_ind)) * next_delta_slice
-        this_beta_slice = (np.ceil(final_slice_ind) - final_slice_ind) * this_beta_slice + (final_slice_ind - np.floor(final_slice_ind)) * next_beta_slice
-        delta_slice += this_delta_slice * (final_slice_ind - np.floor(final_slice_ind))
-        beta_slice += this_beta_slice * (final_slice_ind - np.floor(final_slice_ind))
+            this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
+            next_ri_slice = next_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
+        this_ri_slice = (np.ceil(final_slice_ind) - final_slice_ind) * this_ri_slice + (final_slice_ind - np.floor(final_slice_ind)) * next_ri_slice
+        ri_slice += this_ri_slice * (final_slice_ind - np.floor(final_slice_ind))
         this_slice_ind += 1
-    return delta_slice, beta_slice
+    # Normalize over distance
+    ri_slice /= total_dist
+    return ri_slice
 
 
 def get_padding_lengths(line_st, line_end, px_st, px_end, original_grid_shape, safe_zone_width):
@@ -113,8 +107,15 @@ def get_padding_lengths(line_st, line_end, px_st, px_end, original_grid_shape, s
 
 path_prefix = os.path.join(os.getcwd(), 'charcoal')
 ######################################################################
-psize_cm = 800e-7
+psize_cm = 10e-7
 energy_ev = 25000
+material = 'C'
+density = 0.2
+
+import xommons
+delta = xommons.ri_delta(material, energy_ev / 1e3, density)
+beta = xommons.ri_beta(material, energy_ev / 1e3, density)
+
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
 n_slices_max = 500
@@ -123,6 +124,9 @@ n_slices_ls = np.arange(10, 500, 10)
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
 # n_slices_ls = [10]
+# thick_zp_cm = n_slices_max * psize_cm
+thick_zp_cm = 0.1
+
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
     i_starting_size = int(cp[0])
@@ -145,7 +149,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
     for n_slices in np.take(n_slices_ls, range(i_starting_nslice, len(n_slices_ls))):
 
-        thick_zp_cm = n_slices_max * psize_cm
         free_prop_cm = 0
         slice_spacing_cm = thick_zp_cm / n_slices
 
@@ -166,7 +169,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
         safe_zone_width = ceil(
-            4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
+            5.5 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
         # z_nm = slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7
         # safe_zone_width = np.sqrt(z_nm ** 2 / (4 * (psize_cm * 1e7) ** 2 / lmbda_nm ** 2 - 1))
         # safe_zone_width = ceil(1.1 * safe_zone_width)
@@ -206,7 +209,6 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
             pad_top, pad_bottom, pad_left, pad_right = get_padding_lengths(line_st, line_end, px_st, px_end,
                                                                            original_grid_shape, safe_zone_width)
-            print(pad_top, pad_bottom, pad_left, pad_right, rank)
 
             sub_grid_shape = [min(line_end + safe_zone_width, original_grid_shape[0]) - max([0, line_st - safe_zone_width]),
                               min([px_end + safe_zone_width, original_grid_shape[1]]) - max([0, px_st - safe_zone_width])]
@@ -222,7 +224,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         # Multislice expanded here
 
-        h = util.get_kernel(slice_spacing_cm * 1e7, lmbda_nm, [psize_cm * 1e7, psize_cm * 1e-7, slice_spacing_cm * 1e7], sub_grid_shape, fresnel_approx=True)
+        h = util.get_kernel(slice_spacing_cm * 1e7, lmbda_nm, [psize_cm * 1e7, psize_cm * 1e7, slice_spacing_cm * 1e7], block_probe_real_batch.shape[1:], fresnel_approx=False)
         dt_ls = np.zeros([1, 2])
 
         dt_prop = 0
@@ -231,8 +233,10 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         for i_slice in range(n_slices):
             for ind, i_pos in enumerate(this_pos_ind_ls):
 
-                sub_grid_delta, sub_grid_beta = get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=((max([0, line_st - safe_zone_width]), min([line_end + safe_zone_width, original_grid_shape[0]])),
-                                                                                                                       (max([0, px_st - safe_zone_width]), min([px_end + safe_zone_width, original_grid_shape[1]]))))
+                sub_grid = get_interpolated_slice(i_slice, n_slices_repeating, n_slices_max, n_slices, slc=((max([0, line_st - safe_zone_width]), min([line_end + safe_zone_width, original_grid_shape[0]])),
+                                                                                                            (max([0, px_st - safe_zone_width]), min([px_end + safe_zone_width, original_grid_shape[1]]))))
+                sub_grid_delta = sub_grid * delta
+                sub_grid_beta = sub_grid * beta
 
                 sub_grid_delta = np.reshape(sub_grid_delta, [1, *sub_grid_delta.shape, 1])
                 sub_grid_beta = np.reshape(sub_grid_beta, [1, *sub_grid_beta.shape, 1])
@@ -248,10 +252,9 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
 
 
+
             if rank == 0: dxchange.write_tiff(np.squeeze(block_delta_batch), 'charcoal/size_4096/delta.tiff', dtype='float32')
             if rank == 0: dxchange.write_tiff(np.squeeze(block_beta_batch), 'charcoal/size_4096/beta.tiff', dtype='float32')
-            # block_delta_batch /= 1000
-            # block_beta_batch /= 1000
 
 
 

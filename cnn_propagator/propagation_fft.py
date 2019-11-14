@@ -55,8 +55,14 @@ def multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_im
         t0 = time.time()
         c = np.exp(1j * k * delta_slice) * np.exp(-k * beta_slice)
         wavefront = wavefront * c
-        if i_slice < n_slice - 1:
-            wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
+
+        if rank == 0: dxchange.write_tiff(abs(np.squeeze(wavefront)), 'charcoal/size_4096/wave_modulated.tiff', dtype='float32')
+
+        wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
+
+        if rank == 0: dxchange.write_tiff(abs(np.squeeze(wavefront)), 'charcoal/size_4096/wave_prop.tiff',
+                                          dtype='float32')
+
         t_tot += (time.time() - t0)
 
     if free_prop_cm not in [0, None]:
