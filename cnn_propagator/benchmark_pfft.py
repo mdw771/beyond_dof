@@ -51,23 +51,16 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
     shape = [slc[0][1] - slc[0][0], slc[1][1] - slc[1][0]]
     ri_slice = np.zeros(shape)
     total_dist = final_slice_ind - this_slice_ind
-    # if rank == 0:
-    #     print('slice_full_ls', slice_full_ls)
-    #     print('slice_ind_ls', slice_ind_ls)
-    #     print('slice_ls', slice_ls)
-    #     print('this_slice_ind', this_slice_ind)
-    #     print('final_slice_ind', final_slice_ind)
 
+    dist_px = 0
     if np.ceil(this_slice_ind) - this_slice_ind < 1e-3: # If this_slice_ind is an integer itself
         pass
     else:
         this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
-        next_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind) + 1])))
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            next_ri_slice = next_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-        this_ri_slice = (np.ceil(this_slice_ind) - this_slice_ind) * this_ri_slice + (this_slice_ind - np.floor(this_slice_ind)) * next_ri_slice
         ri_slice += this_ri_slice * (np.ceil(this_slice_ind) - this_slice_ind)
+        dist_px += (np.ceil(this_slice_ind) - this_slice_ind)
         this_slice_ind = np.ceil(this_slice_ind)
     while this_slice_ind + 1 <= final_slice_ind:
         this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
@@ -75,16 +68,14 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice
         this_slice_ind += 1
+        dist_px += 1
     if final_slice_ind - this_slice_ind > 1e-3:
-        final_slice_ind_ceil = int(np.min([np.ceil(final_slice_ind), n_slices_max - 1]))
         this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
-        next_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[final_slice_ind_ceil])))
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-            next_ri_slice = next_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
-        this_ri_slice = (np.ceil(final_slice_ind) - final_slice_ind) * this_ri_slice + (final_slice_ind - np.floor(final_slice_ind)) * next_ri_slice
         ri_slice += this_ri_slice * (final_slice_ind - np.floor(final_slice_ind))
         this_slice_ind += 1
+        dist_px += (final_slice_ind - np.floor(final_slice_ind))
     # Normalize over distance
     ri_slice /= total_dist
     return ri_slice

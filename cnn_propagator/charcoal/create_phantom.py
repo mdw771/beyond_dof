@@ -83,5 +83,5 @@ for i, src_img in tqdm(enumerate(src_img_list[rank:len(src_img_list):n_ranks]), 
     slice[:, -empty_len:] = 0
     slice /= dc
     slice[slice < 0] = 0
-    dxchange.write_tiff(slice, os.path.join(dest_folder, 'img_{:05d}'.format(i)), overwrite=True, dtype='float32')
+    dxchange.write_tiff(slice, os.path.join(dest_folder, 'img_{:05d}'.format(ind)), overwrite=True, dtype='float32')
 
