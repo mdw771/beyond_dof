@@ -136,7 +136,7 @@ verbose = True if rank == 0 else False
 if rank == 0:
     f = open(os.path.join(path_prefix, 'report_pfft.csv'), 'a')
     if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
-        f.write('algorithm,object_size,n_slices,safezone_width,total_time,propagation_time\n')
+        f.write('algorithm,object_size,n_slices,safezone_width,total_time,propagation_time,reading_time\n')
 
 # Benchmark partial FFT propagation
 for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
@@ -223,12 +223,16 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         dt_prop = 0
         dt_tot = 0
+        dt_reading = 0
         t_tot_0 = time.time()
         for i_slice in range(n_slices):
             for ind, i_pos in enumerate(this_pos_ind_ls):
 
+                t_read_0 = time.time()
                 sub_grid = get_interpolated_slice(i_slice, n_slices_repeating, n_slices_max, n_slices, slc=((max([0, line_st - safe_zone_width]), min([line_end + safe_zone_width, original_grid_shape[0]])),
                                                                                                             (max([0, px_st - safe_zone_width]), min([px_end + safe_zone_width, original_grid_shape[1]]))))
+                dt_reading += (time.time() - t_read_0)
+
                 sub_grid_delta = sub_grid * delta
                 sub_grid_beta = sub_grid * beta
 
@@ -307,7 +311,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         if rank == 0:
             print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_tot))
-            f.write('pfft,{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_tot, dt_prop))
+            f.write('pfft,{},{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_tot, dt_prop, dt_reading))
             f.flush()
             os.fsync(f.fileno())
             i_starting_nslice += 1
