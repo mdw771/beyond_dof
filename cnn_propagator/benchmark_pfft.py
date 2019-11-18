@@ -103,9 +103,12 @@ energy_ev = 25000
 material = 'C'
 density = 0.2
 
-import xommons
-delta = xommons.ri_delta(material, energy_ev / 1e3, density)
-beta = xommons.ri_beta(material, energy_ev / 1e3, density)
+# import xommons
+# delta = xommons.ri_delta(material, energy_ev / 1e3, density)
+# beta = xommons.ri_beta(material, energy_ev / 1e3, density)
+# print(delta, beta)
+delta = 6.638119376400908e-08
+beta = 2.4754720576473264e-11
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
