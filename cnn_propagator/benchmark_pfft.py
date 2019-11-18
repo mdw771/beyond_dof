@@ -43,11 +43,10 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
     if n_slices_max % len(slice_full_ls) > 0:
         slice_full_ls = np.append(slice_full_ls, slice_full_ls[:n_slices_max % len(slice_full_ls)])
     # slice_ind_ls is always ascending, e.g. [0, 2.5, 5, 7.5, ..., 500]
-    slice_ind_ls = np.linspace(0, n_slices_max, n_slices)
+    slice_ind_ls = np.linspace(0, n_slices_max, n_slices + 1) # The last index is not actually propagated
     # slice_ls is the numbers in filenames
-    slice_ls = np.interp(slice_ind_ls, np.arange(n_slices_max), slice_full_ls)
     this_slice_ind = slice_ind_ls[i_slice] # Say, 2.5
-    final_slice_ind = slice_ind_ls[i_slice + 1] if i_slice + 1 < n_slices else slice_ls[i_slice] # Say, 5
+    final_slice_ind = slice_ind_ls[i_slice + 1] # Say, 5
     shape = [slc[0][1] - slc[0][0], slc[1][1] - slc[1][0]]
     ri_slice = np.zeros(shape)
     total_dist = final_slice_ind - this_slice_ind
