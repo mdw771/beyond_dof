@@ -31,6 +31,9 @@ except:
     mpi_ok = False
 
 
+if rank == 0: print('Numpy is ', np.__file__)
+
+
 def save_checkpoint(this_size_ind, this_nslice_ind):
     np.savetxt(os.path.join(path_prefix, 'checkpoint.txt'), np.array([this_size_ind, this_nslice_ind]), fmt='%d')
     return
