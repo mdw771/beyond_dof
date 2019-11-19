@@ -138,7 +138,7 @@ verbose = True if rank == 0 else False
 if rank == 0:
     f = open(os.path.join(path_prefix, 'report_pfft.csv'), 'a')
     if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
-        f.write('algorithm,object_size,n_slices,safezone_width,total_time,propagation_time,reading_time\n')
+        f.write('algorithm,object_size,n_slices,safezone_width,total_time,propagation_time,reading_time,writing_time\n')
 
 # Benchmark partial FFT propagation
 for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
@@ -226,6 +226,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         dt_prop = 0
         dt_tot = 0
         dt_reading = 0
+        dt_writing = 0
         t_tot_0 = time.time()
         for i_slice in range(n_slices):
             for ind, i_pos in enumerate(this_pos_ind_ls):
@@ -265,6 +266,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             t0 = time.time()
             dt_prop += dt
 
+        t_write_0 = time.time()
         if hdf5:
             f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
                                           'pfft_nslices_{}_output.h5'.format(n_slices)),
@@ -309,11 +311,12 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                 #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
             comm.Barrier()
 
+        dt_writing = time.time() - t_write_0
         dt_tot = time.time() - t_tot_0
 
         if rank == 0:
             print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_tot))
-            f.write('pfft,{},{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_tot, dt_prop, dt_reading))
+            f.write('pfft,{},{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_tot, dt_prop, dt_reading, dt_writing))
             f.flush()
             os.fsync(f.fileno())
             i_starting_nslice += 1

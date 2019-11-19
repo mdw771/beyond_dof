@@ -55,7 +55,6 @@ def multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_im
         t0 = time.time()
         c = np.exp(1j * k * delta_slice) * np.exp(-k * beta_slice)
         wavefront = wavefront * c
-
         wavefront = ifft2(np_ifftshift(np_fftshift(fft2(wavefront), axes=[1, 2]) * h, axes=[1, 2]))
 
         t_tot += (time.time() - t0)
