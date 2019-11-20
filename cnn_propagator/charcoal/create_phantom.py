@@ -60,7 +60,7 @@ empty_ratio = 0.15
 empty_len = int(img_size[0] * empty_ratio)
 
 src_folder = '/data/datasets/charcoal/recon_crop_8_med'
-dest_folder = 'size_{}/phamtom'.format(img_size[0])
+dest_folder = 'size_{}/phantom'.format(img_size[0])
 
 src_img_list = glob(os.path.join(src_folder, 'recon_*.tiff'))
 src_img_list.sort()

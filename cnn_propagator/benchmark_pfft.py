@@ -13,7 +13,7 @@ from math import ceil, floor
 from propagation_fft import multislice_propagate_batch_numpy
 import util
 
-t_limit = 330
+t_limit = 170
 t_zero = time.time()
 hdf5 = True
 
@@ -40,6 +40,19 @@ def save_checkpoint(this_size_ind, this_nslice_ind):
 
 
 def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None):
+    """
+    Get weighted summation of slice values, where each individual slice contained in a tiff file is normalized to have
+    a mean of 1. The mean of the returned array should be equal to the thickness of the slab in the unit of
+    sample_thickness / n_slices_max.
+    :param i_slice: the current slice's index within range(0, n_slices).
+    :param n_repeats: the number of slices in a period (either ascending or descending). Note that the number of tiff
+                      files needed is n_repeats + 1, because the cycle goes like 0, 1, ..., 49 || 50, 49, ..., 1 || 0, ...
+    :param n_slices_max: the number of original slices that compose the object. n_slices shouldn't go beyond this value.
+    :param n_slices: the number of slices in the current case.
+    :param slc: the lateral region of the slices to be summed. Should have the format of
+                ((y_start, y_end), (x_start, x_end)). If None, then return the full slice.
+    :return: weighted summation of the slice value.
+    """
 
     slice_full_ls = np.concatenate((range(n_repeats), range(n_repeats, 0, -1)))
     slice_full_ls = np.tile(slice_full_ls, n_slices_max // len(slice_full_ls))
@@ -316,7 +329,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         if rank == 0:
             print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_tot))
-            f.write('pfft,{},{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_tot, dt_prop, dt_reading, dt_writing))
+            f.write('pfft,{},{},{},{},{},{},{}\n'.format(this_size, n_slices, safe_zone_width, dt_tot, dt_prop, dt_reading, dt_writing))
             f.flush()
             os.fsync(f.fileno())
             i_starting_nslice += 1
