@@ -63,7 +63,10 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
     # slice_ls is the numbers in filenames
     this_slice_ind = slice_ind_ls[i_slice] # Say, 2.5
     final_slice_ind = slice_ind_ls[i_slice + 1] # Say, 5
-    shape = [slc[0][1] - slc[0][0], slc[1][1] - slc[1][0]]
+    if slc is None:
+        shape = original_grid_shape[:2]
+    else:
+        shape = [slc[0][1] - slc[0][0], slc[1][1] - slc[1][0]]
     ri_slice = np.zeros(shape)
     total_dist = final_slice_ind - this_slice_ind
 
@@ -197,6 +200,12 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         n_blocks_x = int(np.sqrt(original_grid_shape[1] / original_grid_shape[0] * n_ranks))
         n_blocks = n_blocks_x * n_blocks_y
         block_size = ceil(max([original_grid_shape[0] / n_blocks_y, original_grid_shape[1] / n_blocks_x]))
+        if rank == 0:
+            print('n_blocks_y: ', n_blocks_y)
+            print('n_blocks_x: ', n_blocks_x)
+            print('n_blocks: ', n_blocks)
+            print('block_size: ', block_size)
+            print('n_ranks: ', n_ranks)
         this_pos_ind_ls = range(rank, n_blocks, n_ranks)
         block_delta_batch = np.zeros(
             [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width,
