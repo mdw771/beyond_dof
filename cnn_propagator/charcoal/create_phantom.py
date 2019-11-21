@@ -72,8 +72,9 @@ shift_grid = tomosaic.start_shift_grid(file_grid, tile_size, tile_size)
 tile0 = dxchange.read_tiff(src_img_list[0], slc=((roi_lt_corner[0], roi_lt_corner[0] + blend_len * 2), (roi_lt_corner[1], roi_lt_corner[1] + blend_len * 2)))
 dc = np.mean(tile0)
 
-for i, src_img in tqdm(enumerate(src_img_list[rank:len(src_img_list):n_ranks]), total=len(src_img_list[rank:len(src_img_list):n_ranks])):
-    ind = rank + i * n_ranks
+for i, src_img in tqdm(enumerate(src_img_list[rank+43:len(src_img_list):n_ranks]), total=len(src_img_list[rank:len(src_img_list):n_ranks])):
+    ind = rank + i * n_ranks+43
+    print(ind)
     tile = dxchange.read_tiff(src_img, slc=((roi_lt_corner[0], roi_lt_corner[0] + tile_size + blend_len * 2), (roi_lt_corner[1], roi_lt_corner[1] + tile_size + blend_len * 2)))
     slice = build_panorama(file_grid, shift_grid, tile, method='pyramid', blend_options={'depth': 3, 'blur': 0.4})
     slice = slice[blend_len:-blend_len, blend_len:-blend_len]

@@ -250,7 +250,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         dt_reading = 0
         dt_writing = 0
         t_tot_0 = time.time()
-        for i_slice in range(n_slices):
+        for i_slice in trange(n_slices, verbose=(rank == 0)):
             for ind, i_pos in enumerate(this_pos_ind_ls):
 
                 t_read_0 = time.time()
