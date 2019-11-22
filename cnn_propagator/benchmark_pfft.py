@@ -119,14 +119,15 @@ path_prefix = os.path.join(os.getcwd(), 'charcoal')
 psize_cm = 10e-7
 energy_ev = 25000
 material = 'C'
-density = 0.2
+density = 2
 
 # import xommons
 # delta = xommons.ri_delta(material, energy_ev / 1e3, density)
 # beta = xommons.ri_beta(material, energy_ev / 1e3, density)
 # print(delta, beta)
-delta = 6.638119376400908e-08
-beta = 2.4754720576473264e-11
+delta = 6.638119376400908e-07
+beta = 2.4754720576473264e-10
+safe_zone_factor = 8
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
@@ -181,7 +182,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
         safe_zone_width = ceil(
-            5.5 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
+            safe_zone_factor * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
         # z_nm = slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7
         # safe_zone_width = np.sqrt(z_nm ** 2 / (4 * (psize_cm * 1e7) ** 2 / lmbda_nm ** 2 - 1))
         # safe_zone_width = ceil(1.1 * safe_zone_width)
@@ -250,7 +251,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         dt_reading = 0
         dt_writing = 0
         t_tot_0 = time.time()
-        for i_slice in trange(n_slices, verbose=(rank == 0)):
+        for i_slice in trange(n_slices, disable=(rank != 0)):
             for ind, i_pos in enumerate(this_pos_ind_ls):
 
                 t_read_0 = time.time()
