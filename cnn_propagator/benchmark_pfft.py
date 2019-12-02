@@ -116,29 +116,31 @@ def get_padding_lengths(line_st, line_end, px_st, px_end, original_grid_shape, s
 
 path_prefix = os.path.join(os.getcwd(), 'charcoal')
 ######################################################################
-psize_cm = 10e-7
+psize_cm = 5e-7
 energy_ev = 25000
-material = 'C'
-density = 2
+material = 'Au'
+density = 19.32
 
 # import xommons
 # delta = xommons.ri_delta(material, energy_ev / 1e3, density)
 # beta = xommons.ri_beta(material, energy_ev / 1e3, density)
 # print(delta, beta)
-delta = 6.638119376400908e-07
-beta = 2.4754720576473264e-10
-safe_zone_factor = 8
+# delta = 6.638119376400908e-07
+# beta = 2.4754720576473264e-10
+delta = 5.1053512407639445e-06
+beta = 3.3630855527288826e-07
+safe_zone_factor = 4
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
 n_slices_max = 500
 size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-n_slices_ls = np.arange(10, 500, 10)
+n_slices_ls = np.arange(10, 501, 10)
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
 # n_slices_ls = [10]
 # thick_zp_cm = n_slices_max * psize_cm
-thick_zp_cm = 0.1
+thick_zp_cm = 20e-4
 
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
@@ -288,6 +290,9 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
             t0 = time.time()
             dt_prop += dt
+
+        # if rank == 0: dxchange.write_tiff(abs(wavefield[0]), 'charcoal/size_4096/partial0.tiff', dtype='float32', overwrite=True)
+        # if rank == 1: dxchange.write_tiff(abs(wavefield[0]), 'charcoal/size_4096/partial0.tiff', dtype='float32', overwrite=True)
 
         t_write_0 = time.time()
         if hdf5:
