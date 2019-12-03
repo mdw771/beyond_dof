@@ -116,7 +116,7 @@ def get_padding_lengths(line_st, line_end, px_st, px_end, original_grid_shape, s
 
 path_prefix = os.path.join(os.getcwd(), 'charcoal')
 ######################################################################
-psize_cm = 5e-7
+psize_cm = 1e-7
 energy_ev = 25000
 material = 'Au'
 density = 19.32
@@ -134,8 +134,9 @@ safe_zone_factor = 4
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
 n_slices_max = 500
-size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-n_slices_ls = np.arange(10, 501, 10)
+# size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
+size_ls = [4096]
+n_slices_ls = np.arange(10, 1001, 10)
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
 # n_slices_ls = [10]
