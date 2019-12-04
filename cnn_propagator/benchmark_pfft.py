@@ -39,7 +39,7 @@ def save_checkpoint(this_size_ind, this_nslice_ind):
     return
 
 
-def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None):
+def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None, mask=False):
     """
     Get weighted summation of slice values, where each individual slice contained in a tiff file is normalized to have
     a mean of 1. The mean of the returned array should be equal to the thickness of the slab in the unit of
@@ -54,6 +54,7 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
     :return: weighted summation of the slice value.
     """
 
+    prefix = 'mask' if mask else 'img'
     slice_full_ls = np.concatenate((range(n_repeats), range(n_repeats, 0, -1)))
     slice_full_ls = np.tile(slice_full_ls, n_slices_max // len(slice_full_ls))
     if n_slices_max % len(slice_full_ls) > 0:
@@ -74,21 +75,21 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None)
     if np.ceil(this_slice_ind) - this_slice_ind < 1e-3: # If this_slice_ind is an integer itself
         pass
     else:
-        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
+        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', '{}_{:05}.tiff'.format(prefix, slice_full_ls[int(this_slice_ind)])))
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice * (np.ceil(this_slice_ind) - this_slice_ind)
         dist_px += (np.ceil(this_slice_ind) - this_slice_ind)
         this_slice_ind = np.ceil(this_slice_ind)
     while this_slice_ind + 1 <= final_slice_ind:
-        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
+        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', '{}_{:05}.tiff'.format(prefix, slice_full_ls[int(this_slice_ind)])))
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice
         this_slice_ind += 1
         dist_px += 1
     if final_slice_ind - this_slice_ind > 1e-3:
-        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', 'img_{:05}.tiff'.format(slice_full_ls[int(this_slice_ind)])))
+        this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', '{}_{:05}.tiff'.format(prefix, slice_full_ls[int(this_slice_ind)])))
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice * (final_slice_ind - np.floor(final_slice_ind))
@@ -116,20 +117,21 @@ def get_padding_lengths(line_st, line_end, px_st, px_end, original_grid_shape, s
 
 path_prefix = os.path.join(os.getcwd(), 'charcoal')
 ######################################################################
-psize_cm = 1e-7
+psize_cm = 3e-7
 energy_ev = 25000
-material = 'Al'
-density = 6
 
 import xommons
-delta = xommons.ri_delta(material, energy_ev / 1e3, density)
-beta = xommons.ri_beta(material, energy_ev / 1e3, density)
+delta1 = xommons.ri_delta('Al', energy_ev / 1e3, 2.7)
+beta1 = xommons.ri_beta('Al', energy_ev / 1e3, 2.7)
+delta2 = xommons.ri_delta('Au', energy_ev / 1e3, 19.32)
+beta2 = xommons.ri_beta('Au', energy_ev / 1e3, 19.32)
 # print(delta, beta)
 # delta = 6.638119376400908e-07
 # beta = 2.4754720576473264e-10
 # delta = 5.1053512407639445e-06
 # beta = 3.3630855527288826e-07
-if rank == 0: print('Refractive indices:', delta, beta)
+if rank == 0: print('Refractive indices:', delta1, beta1)
+if rank == 0: print('Refractive indices:', delta2, beta2)
 safe_zone_factor = 4
 
 lmbda_nm = 1240. / energy_ev
@@ -138,6 +140,7 @@ n_slices_max = 1000
 # size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
 size_ls = [4096]
 n_slices_ls = np.arange(10, 1001, 10)
+# n_slices_ls = [100]
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
 # n_slices_ls = [10]
@@ -261,10 +264,15 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                 t_read_0 = time.time()
                 sub_grid = get_interpolated_slice(i_slice, n_slices_repeating, n_slices_max, n_slices, slc=((max([0, line_st - safe_zone_width]), min([line_end + safe_zone_width, original_grid_shape[0]])),
                                                                                                             (max([0, px_st - safe_zone_width]), min([px_end + safe_zone_width, original_grid_shape[1]]))))
+                mask = get_interpolated_slice(i_slice, n_slices_repeating, n_slices_max, n_slices, slc=((max([0, line_st - safe_zone_width]), min([line_end + safe_zone_width, original_grid_shape[0]])),
+                                                                                                            (max([0, px_st - safe_zone_width]), min([px_end + safe_zone_width, original_grid_shape[1]]))), mask=True)
                 dt_reading += (time.time() - t_read_0)
 
-                sub_grid_delta = sub_grid * delta
-                sub_grid_beta = sub_grid * beta
+                # sub_grid_delta = sub_grid * delta
+                # sub_grid_beta = sub_grid * beta
+                # dxchange.write_tiff(mask, 'charcoal/size_4096/mask', dtype='float32')
+                sub_grid_delta = sub_grid * (1 - mask) * delta1 + sub_grid * mask * delta2
+                sub_grid_beta = sub_grid * (1 - mask) * beta1 + sub_grid * mask * beta2
 
                 sub_grid_delta = np.reshape(sub_grid_delta, [1, *sub_grid_delta.shape, 1])
                 sub_grid_beta = np.reshape(sub_grid_beta, [1, *sub_grid_beta.shape, 1])
@@ -293,7 +301,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             t0 = time.time()
             dt_prop += dt
 
-        # if rank == 0: dxchange.write_tiff(abs(wavefield[0]), 'charcoal/size_4096/partial0.tiff', dtype='float32', overwrite=True)
+            # if rank == 0: dxchange.write_tiff(abs(wavefield[0]), 'charcoal/size_4096/partial0.tiff', dtype='float32', overwrite=True)
         # if rank == 1: dxchange.write_tiff(abs(wavefield[0]), 'charcoal/size_4096/partial0.tiff', dtype='float32', overwrite=True)
 
         t_write_0 = time.time()
