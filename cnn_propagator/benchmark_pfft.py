@@ -142,7 +142,7 @@ n_slices_ls = np.arange(10, 1001, 10)
 # size_ls = [256]
 # n_slices_ls = [10]
 # thick_zp_cm = n_slices_max * psize_cm
-thick_zp_cm = 20e-4
+thick_zp_cm = 0.1
 
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
