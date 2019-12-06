@@ -145,11 +145,11 @@ safe_zone_factor = 4
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
-n_slices_max = 100
+n_slices_max = 1000
 # size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
 size_ls = [4096]
 n_slices_ls = np.arange(10, 1001, 10)
-n_slices_ls = [99, 100]
+# n_slices_ls = [99, 100]
 # n_slices_ls = [100]
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
