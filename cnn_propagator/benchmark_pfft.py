@@ -13,7 +13,7 @@ from math import ceil, floor
 from propagation_fft import multislice_propagate_batch_numpy
 import util
 
-t_limit = 170
+t_limit = 160
 t_zero = time.time()
 hdf5 = True
 
@@ -72,13 +72,14 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None,
     total_dist = final_slice_ind - this_slice_ind
 
     dist_px = 0
-    if np.ceil(this_slice_ind) - this_slice_ind < 1e-3: # If this_slice_ind is an integer itself
+    if np.ceil(this_slice_ind) - this_slice_ind < 1e-8: # If this_slice_ind is an integer itself
         pass
     else:
         this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', '{}_{:05}.tiff'.format(prefix, slice_full_ls[int(this_slice_ind)])))
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice * (np.ceil(this_slice_ind) - this_slice_ind)
+        if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], np.ceil(this_slice_ind) - this_slice_ind))
         dist_px += (np.ceil(this_slice_ind) - this_slice_ind)
         this_slice_ind = np.ceil(this_slice_ind)
     while this_slice_ind + 1 <= final_slice_ind:
@@ -86,16 +87,20 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None,
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice
+        if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], 1))
         this_slice_ind += 1
         dist_px += 1
-    if final_slice_ind - this_slice_ind > 1e-3:
+    if final_slice_ind - this_slice_ind > 1e-8:
         this_ri_slice = dxchange.read_tiff(os.path.join(path_prefix, 'size_{}'.format(this_size), 'phantom', '{}_{:05}.tiff'.format(prefix, slice_full_ls[int(this_slice_ind)])))
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice * (final_slice_ind - np.floor(final_slice_ind))
+        if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], final_slice_ind - np.floor(final_slice_ind)))
         this_slice_ind += 1
         dist_px += (final_slice_ind - np.floor(final_slice_ind))
+
     # Normalize over distance
+    if rank == 0: print('Distance: {}'.format(dist_px))
     ri_slice /= total_dist
     return ri_slice
 
@@ -120,11 +125,15 @@ path_prefix = os.path.join(os.getcwd(), 'charcoal')
 psize_cm = 3e-7
 energy_ev = 25000
 
-import xommons
-delta1 = xommons.ri_delta('Al', energy_ev / 1e3, 2.7)
-beta1 = xommons.ri_beta('Al', energy_ev / 1e3, 2.7)
-delta2 = xommons.ri_delta('Au', energy_ev / 1e3, 19.32)
-beta2 = xommons.ri_beta('Au', energy_ev / 1e3, 19.32)
+# import xommons
+# delta1 = xommons.ri_delta('Al', energy_ev / 1e3, 2.7)
+# beta1 = xommons.ri_beta('Al', energy_ev / 1e3, 2.7)
+# delta2 = xommons.ri_delta('Au', energy_ev / 1e3, 19.32)
+# beta2 = xommons.ri_beta('Au', energy_ev / 1e3, 19.32)
+delta1 = 8.666320754358026e-07
+beta1 = 1.95600602233921e-09
+delta2 = 5.1053512407639445e-06
+beta2 = 3.3630855527288826e-07
 # print(delta, beta)
 # delta = 6.638119376400908e-07
 # beta = 2.4754720576473264e-10
@@ -136,10 +145,11 @@ safe_zone_factor = 4
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
-n_slices_max = 1000
+n_slices_max = 100
 # size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
 size_ls = [4096]
 n_slices_ls = np.arange(10, 1001, 10)
+n_slices_ls = [99, 100]
 # n_slices_ls = [100]
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
@@ -258,7 +268,8 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         dt_reading = 0
         dt_writing = 0
         t_tot_0 = time.time()
-        for i_slice in trange(n_slices, disable=(rank != 0)):
+        for i_slice in trange(n_slices, disable=True):
+            if rank == 0: print('Slice: {} / {}'.format(i_slice + 1, n_slices))
             for ind, i_pos in enumerate(this_pos_ind_ls):
 
                 t_read_0 = time.time()
