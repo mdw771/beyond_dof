@@ -122,7 +122,7 @@ def get_padding_lengths(line_st, line_end, px_st, px_end, original_grid_shape, s
 
 path_prefix = os.path.join(os.getcwd(), 'charcoal')
 ######################################################################
-psize_cm = 3e-7
+psize_cm = 1e-7
 energy_ev = 25000
 
 # import xommons
@@ -150,12 +150,12 @@ n_slices_max = 1000
 size_ls = [4096]
 n_slices_ls = np.arange(10, 1001, 10)
 # n_slices_ls = [99, 100]
-# n_slices_ls = [100]
+n_slices_ls = [1000]
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
 # n_slices_ls = [10]
 # thick_zp_cm = n_slices_max * psize_cm
-thick_zp_cm = 0.1
+thick_zp_cm = 330e-4
 
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
@@ -284,6 +284,8 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                 # dxchange.write_tiff(mask, 'charcoal/size_4096/mask', dtype='float32')
                 sub_grid_delta = sub_grid * (1 - mask) * delta1 + sub_grid * mask * delta2
                 sub_grid_beta = sub_grid * (1 - mask) * beta1 + sub_grid * mask * beta2
+                dxchange.write_tiff(sub_grid_delta, os.path.join(path_prefix, 'size_4096', 'delta'), dtype='float32')
+                dxchange.write_tiff(sub_grid_beta, os.path.join(path_prefix, 'size_4096', 'beta'), dtype='float32')
 
                 sub_grid_delta = np.reshape(sub_grid_delta, [1, *sub_grid_delta.shape, 1])
                 sub_grid_beta = np.reshape(sub_grid_beta, [1, *sub_grid_beta.shape, 1])
