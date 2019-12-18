@@ -142,6 +142,7 @@ beta2 = 3.3630855527288826e-07
 if rank == 0: print('Refractive indices:', delta1, beta1)
 if rank == 0: print('Refractive indices:', delta2, beta2)
 safe_zone_factor = 2
+safe_zone_width = 240
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
@@ -198,8 +199,8 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         ref = dxchange.read_tiff(
             os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
-        safe_zone_width = ceil(
-            safe_zone_factor * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
+        # safe_zone_width = ceil(
+        #     safe_zone_factor * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
         # z_nm = slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7
         # safe_zone_width = np.sqrt(z_nm ** 2 / (4 * (psize_cm * 1e7) ** 2 / lmbda_nm ** 2 - 1))
         # safe_zone_width = ceil(1.1 * safe_zone_width)
