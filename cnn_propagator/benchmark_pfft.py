@@ -141,7 +141,7 @@ beta2 = 3.3630855527288826e-07
 # beta = 3.3630855527288826e-07
 if rank == 0: print('Refractive indices:', delta1, beta1)
 if rank == 0: print('Refractive indices:', delta2, beta2)
-safe_zone_factor = 4
+safe_zone_factor = 2
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
