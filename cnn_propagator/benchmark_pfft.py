@@ -12,6 +12,7 @@ import pickle
 from math import ceil, floor
 from propagation_fft import multislice_propagate_batch_numpy
 import util
+import argparse
 
 t_limit = 160
 t_zero = time.time()
@@ -100,7 +101,7 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None,
         dist_px += (final_slice_ind - np.floor(final_slice_ind))
 
     # Normalize over distance
-    if rank == 0: print('Distance: {}'.format(dist_px))
+    # if rank == 0: print('Distance: {}'.format(dist_px))
     ri_slice /= total_dist
     return ri_slice
 
@@ -142,7 +143,7 @@ beta2 = 3.3630855527288826e-07
 if rank == 0: print('Refractive indices:', delta1, beta1)
 if rank == 0: print('Refractive indices:', delta2, beta2)
 safe_zone_factor = 2
-safe_zone_width = 240
+safe_zone_width = 192
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
@@ -157,6 +158,13 @@ n_slices_ls = np.arange(25, 1001, 25)
 # n_slices_ls = [10]
 # thick_zp_cm = n_slices_max * psize_cm
 thick_zp_cm = 110e-4
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--thickness_um', default='None')
+parser.add_argument('--psize_nm', default='None')
+args = parser.parse_args()
+if args.thickness_um != 'None': thick_zp_cm = float(args.thickness_um * 1e-4)
+if args.psize_nm != 'None': psize_cm = float(args.psize_nm * 1e-7)
 
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
@@ -320,8 +328,11 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         t_write_0 = time.time()
         if hdf5:
-            f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                          'pfft_nslices_{}_output.h5'.format(n_slices)),
+            save_path = os.path.join(path_prefix, 'size_{}'.format(this_size),
+                                     'Al_Au_{}nm_{}um'.format(int(psize_cm * 1e7), int(thick_zp_cm * 1e4)))
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+            f_out = h5py.File(os.path.join(save_path, 'pfft_nslices_{}_output.h5'.format(n_slices)),
                               'w', driver='mpio', comm=comm)
             dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
             pos_ind_ls = range(rank, n_blocks, n_ranks)
