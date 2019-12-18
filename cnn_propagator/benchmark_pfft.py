@@ -163,8 +163,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--thickness_um', default='None')
 parser.add_argument('--psize_nm', default='None')
 args = parser.parse_args()
-if args.thickness_um != 'None': thick_zp_cm = float(args.thickness_um * 1e-4)
-if args.psize_nm != 'None': psize_cm = float(args.psize_nm * 1e-7)
+if args.thickness_um != 'None': thick_zp_cm = float(args.thickness_um) * 1e-4
+if args.psize_nm != 'None': psize_cm = float(args.psize_nm) * 1e-7
 
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
