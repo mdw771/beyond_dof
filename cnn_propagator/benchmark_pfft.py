@@ -178,9 +178,13 @@ n_repeats = 1
 verbose = True if rank == 0 else False
 
 # Create report
+sub_folder = 'size_4096/Al_Au_{}nm_{}um'.format(int(psize_cm * 1e7), int(thick_zp_cm * 1e4))
+
 if rank == 0:
-    f = open(os.path.join(path_prefix, 'report_pfft.csv'), 'a')
-    if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
+    if not os.path.exists(os.path.join(path_prefix, sub_folder)):
+        os.makedirs(os.path.join(path_prefix, sub_folder))
+    f = open(os.path.join(path_prefix, sub_folder, 'report_pfft.csv'), 'a')
+    if os.path.getsize(os.path.join(path_prefix, sub_folder, 'report_pfft.csv')) == 0:
         f.write('algorithm,object_size,n_slices,safezone_width,total_time,propagation_time,reading_time,writing_time\n')
 
 # Benchmark partial FFT propagation
@@ -328,8 +332,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         t_write_0 = time.time()
         if hdf5:
-            save_path = os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                     'Al_Au_{}nm_{}um'.format(int(psize_cm * 1e7), int(thick_zp_cm * 1e4)))
+            save_path = os.path.join(path_prefix, sub_folder)
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
             f_out = h5py.File(os.path.join(save_path, 'pfft_nslices_{}_output.h5'.format(n_slices)),
