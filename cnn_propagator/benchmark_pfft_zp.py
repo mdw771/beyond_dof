@@ -12,7 +12,7 @@ import pickle
 from math import ceil, floor
 from propagation_fft import multislice_propagate_batch_numpy
 
-t_limit = 330
+t_limit = 170
 t_zero = time.time()
 hdf5 = True
 
@@ -37,8 +37,9 @@ def save_checkpoint(this_size_ind, this_nslice_ind):
 
 path_prefix = os.path.join(os.getcwd(), 'zp')
 ######################################################################
-size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
-n_slices_ls = np.arange(10, 600, 5)
+size_ls = 4096 * np.array([16]).astype('int')
+n_slices_ls = np.arange(20, 25, 1)
+# n_slices_ls = np.concatenate([n_slices_ls, np.arange(50, 101, 5)])
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
 # n_slices_ls = [10]
@@ -72,7 +73,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         lmbda_nm = parameters['wavelength in m'] * 1e9
         energy_ev = parameters['energy(in eV)']
         focal_len_m = parameters['focal_length']
-        thick_zp_cm = 10e-4
+        thick_zp_cm = 30.808e-4
         free_prop_cm = 0
         slice_spacing_cm = thick_zp_cm / n_slices
 
@@ -91,8 +92,8 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         size_factor = size_ls[-1] // this_size
         # psize_cm = psize_min_cm * size_factor
 
-        ref = dxchange.read_tiff(
-            os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
+        #ref = dxchange.read_tiff(
+        #    os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
         safe_zone_width = ceil(
             4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))

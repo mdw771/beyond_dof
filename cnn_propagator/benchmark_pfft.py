@@ -79,7 +79,7 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None,
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice * (np.ceil(this_slice_ind) - this_slice_ind)
-        if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], np.ceil(this_slice_ind) - this_slice_ind))
+        # if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], np.ceil(this_slice_ind) - this_slice_ind))
         dist_px += (np.ceil(this_slice_ind) - this_slice_ind)
         this_slice_ind = np.ceil(this_slice_ind)
     while this_slice_ind + 1 <= final_slice_ind:
@@ -87,7 +87,7 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None,
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice
-        if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], 1))
+        # if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], 1))
         this_slice_ind += 1
         dist_px += 1
     if final_slice_ind - this_slice_ind > 1e-8:
@@ -95,7 +95,7 @@ def get_interpolated_slice(i_slice, n_repeats, n_slices_max, n_slices, slc=None,
         if slc is not None:
             this_ri_slice = this_ri_slice[slc[0][0]:slc[0][1], slc[1][0]:slc[1][1]]
         ri_slice += this_ri_slice * (final_slice_ind - np.floor(final_slice_ind))
-        if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], final_slice_ind - np.floor(final_slice_ind)))
+        # if rank == 0: print('{}_{:05}.tiff * {}'.format(prefix, slice_full_ls[int(this_slice_ind)], final_slice_ind - np.floor(final_slice_ind)))
         this_slice_ind += 1
         dist_px += (final_slice_ind - np.floor(final_slice_ind))
 
@@ -148,14 +148,14 @@ n_slices_repeating = 50
 n_slices_max = 1000
 # size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
 size_ls = [4096]
-n_slices_ls = np.arange(10, 1001, 10)
+n_slices_ls = np.arange(25, 1001, 25)
 # n_slices_ls = [99, 100]
-n_slices_ls = [1000]
+# n_slices_ls = [1000]
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
 # size_ls = [256]
 # n_slices_ls = [10]
 # thick_zp_cm = n_slices_max * psize_cm
-thick_zp_cm = 330e-4
+thick_zp_cm = 110e-4
 
 try:
     cp = np.loadtxt(os.path.join(path_prefix, 'checkpoint.txt'))
@@ -284,8 +284,8 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                 # dxchange.write_tiff(mask, 'charcoal/size_4096/mask', dtype='float32')
                 sub_grid_delta = sub_grid * (1 - mask) * delta1 + sub_grid * mask * delta2
                 sub_grid_beta = sub_grid * (1 - mask) * beta1 + sub_grid * mask * beta2
-                dxchange.write_tiff(sub_grid_delta, os.path.join(path_prefix, 'size_4096', 'delta'), dtype='float32')
-                dxchange.write_tiff(sub_grid_beta, os.path.join(path_prefix, 'size_4096', 'beta'), dtype='float32')
+                # dxchange.write_tiff(sub_grid_delta, os.path.join(path_prefix, 'size_4096', 'delta'), dtype='float32')
+                # dxchange.write_tiff(sub_grid_beta, os.path.join(path_prefix, 'size_4096', 'beta'), dtype='float32')
 
                 sub_grid_delta = np.reshape(sub_grid_delta, [1, *sub_grid_delta.shape, 1])
                 sub_grid_beta = np.reshape(sub_grid_beta, [1, *sub_grid_beta.shape, 1])

@@ -10,10 +10,11 @@ from constants import *
 from tqdm import trange
 import dxchange
 import time
+import os
 
 from util import *
 
-def multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, h=None, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=True, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
+def multislice_propagate_batch_numpy(grid_delta, grid_beta, probe_real, probe_imag, energy_ev, psize_cm, h=None, free_prop_cm=None, obj_batch_shape=None, return_fft_time=True, starting_slice=0, debug=False, debug_save_path=None, rank=0, t_init=0, verbose=False, repeating_slice=None):
 
     minibatch_size = obj_batch_shape[0]
     voxel_nm = np.array(psize_cm) * 1.e7
