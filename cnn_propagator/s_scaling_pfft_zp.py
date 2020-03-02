@@ -162,36 +162,41 @@ for ind, i_pos in enumerate(this_pos_ind_ls):
 
 
 for i in range(n_repeats):
-    t_tot_0 = time.time()
-    # -----------------------------------------
-    wavefield, dt = multislice_propagate_batch_numpy(block_delta_batch, block_beta_batch,
-                                                     block_probe_real_batch, block_probe_imag_batch, energy_ev,
-                                                     [psize_cm, psize_cm, slice_spacing_cm],
-                                                     obj_batch_shape=block_delta_batch.shape,
-                                                     return_fft_time=True, starting_slice=0, t_init=0,
-                                                     debug=False, debug_save_path=None,
-                                                     rank=rank, verbose=verbose, repeating_slice=n_slices)
+    if block_delta_batch.shape[0] > 0:
+        comm.Barrier()
+        t_tot_0 = time.time()
+        # -----------------------------------------
+        wavefield, dt = multislice_propagate_batch_numpy(block_delta_batch, block_beta_batch,
+                                                         block_probe_real_batch, block_probe_imag_batch, energy_ev,
+                                                         [psize_cm, psize_cm, slice_spacing_cm],
+                                                         obj_batch_shape=block_delta_batch.shape,
+                                                         return_fft_time=True, starting_slice=0, t_init=0,
+                                                         debug=False, debug_save_path=None,
+                                                         rank=rank, verbose=verbose, repeating_slice=n_slices)
+        comm.Barrier()
+        dt_fft_prop = dt
+        # -----------------------------------------
+        t_write_0 = time.time()
+        comm.Barrier()
+        f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
+                                      'pfft_nslices_{}_output.h5'.format(n_slices)),
+                                      'w', driver='mpio', comm=comm)
+        dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
+        pos_ind_ls = range(rank, n_blocks, n_ranks)
+        for ind, i_pos in enumerate(pos_ind_ls):
+            line_st = i_pos // n_blocks_x * block_size
+            line_end = min([line_st + block_size, original_grid_shape[0]])
+            px_st = i_pos % n_blocks_x * block_size
+            px_end = min([px_st + block_size, original_grid_shape[1]])
+            dset[line_st:line_end, px_st:px_end] += wavefield[ind,
+                                                              safe_zone_width:safe_zone_width + (line_end - line_st),
+                                                              safe_zone_width:safe_zone_width + (px_end - px_st)]
+        f_out.close()
+        comm.Barrier()
+        dt_write = time.time() - t_write_0
+        # -----------------------------------------
+        dt_total = time.time() - t_tot_0
 
-    dt_fft_prop = dt
-    # -----------------------------------------
-    t_write_0 = time.time()
-    f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                  'pfft_nslices_{}_output.h5'.format(n_slices)),
-                                  'w', driver='mpio', comm=comm)
-    dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
-    pos_ind_ls = range(rank, n_blocks, n_ranks)
-    for ind, i_pos in enumerate(pos_ind_ls):
-        line_st = i_pos // n_blocks_x * block_size
-        line_end = min([line_st + block_size, original_grid_shape[0]])
-        px_st = i_pos % n_blocks_x * block_size
-        px_end = min([px_st + block_size, original_grid_shape[1]])
-        dset[line_st:line_end, px_st:px_end] += wavefield[ind,
-                                                          safe_zone_width:safe_zone_width + (line_end - line_st),
-                                                          safe_zone_width:safe_zone_width + (px_end - px_st)]
-    f_out.close()
-    dt_write = time.time() - t_write_0
-    # -----------------------------------------
-    dt_total = time.time() - t_tot_0
     comm.Barrier()
 
     if rank == 0:

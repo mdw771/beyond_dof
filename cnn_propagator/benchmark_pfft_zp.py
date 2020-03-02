@@ -97,6 +97,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
 
         safe_zone_width = ceil(
             4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
+        print(safe_zone_width)
         # z_nm = slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7
         # safe_zone_width = np.sqrt(z_nm ** 2 / (4 * (psize_cm * 1e7) ** 2 / lmbda_nm ** 2 - 1))
         # safe_zone_width = ceil(1.1 * safe_zone_width)
@@ -174,66 +175,67 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
             # 1st column excludes hard drive I/O, while 2nd column is the total time.
             dt_ls = np.zeros([n_repeats, 2])
         for i in range(n_repeats):
-            t_tot_0 = time.time()
-            wavefield, dt = multislice_propagate_batch_numpy(block_delta_batch, block_beta_batch,
-                                                             block_probe_real_batch, block_probe_imag_batch, energy_ev,
-                                                             [psize_cm, psize_cm, slice_spacing_cm],
-                                                             obj_batch_shape=block_delta_batch.shape,
-                                                             return_fft_time=True, starting_slice=0, t_init=0,
-                                                             debug=False, debug_save_path=None,
-                                                             rank=rank, verbose=verbose, repeating_slice=n_slices)
+            if block_delta_batch.shape[0]:
+                t_tot_0 = time.time()
+                wavefield, dt = multislice_propagate_batch_numpy(block_delta_batch, block_beta_batch,
+                                                                 block_probe_real_batch, block_probe_imag_batch, energy_ev,
+                                                                 [psize_cm, psize_cm, slice_spacing_cm],
+                                                                 obj_batch_shape=block_delta_batch.shape,
+                                                                 return_fft_time=True, starting_slice=0, t_init=0,
+                                                                 debug=False, debug_save_path=None,
+                                                                 rank=rank, verbose=verbose, repeating_slice=n_slices)
 
-            dt_prop = dt
-            t0 = time.time()
+                dt_prop = dt
+                t0 = time.time()
 
-            if hdf5:
-                f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                              'pfft_nslices_{}_output.h5'.format(n_slices)),
-                                  'w', driver='mpio', comm=comm)
-                dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
-                pos_ind_ls = range(rank, n_blocks, n_ranks)
-                for ind, i_pos in enumerate(pos_ind_ls):
-                    line_st = i_pos // n_blocks_x * block_size
-                    line_end = min([line_st + block_size, original_grid_shape[0]])
-                    px_st = i_pos % n_blocks_x * block_size
-                    px_end = min([px_st + block_size, original_grid_shape[1]])
-                    dset[line_st:line_end, px_st:px_end] += wavefield[ind,
-                                                                      safe_zone_width:safe_zone_width + (line_end - line_st),
-                                                                      safe_zone_width:safe_zone_width + (px_end - px_st)]
-                f_out.close()
-                dt += time.time() - t0
-                dt_ls[i, 0] = dt
-                dt_ls[i, 1] = time.time() - t_tot_0
-            else:
-                block_ls = comm.gather(wavefield, root=0)
-                if rank == 0:
-                    full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex64)
-                    for i_src_rank in range(len(block_ls)):
-                        pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
-                        for ind, i_pos in enumerate(pos_ind_ls):
-                            line_st = i_pos // n_blocks_x * block_size
-                            line_end = min([line_st + block_size, original_grid_shape[0]])
-                            px_st = i_pos % n_blocks_x * block_size
-                            px_end = min([px_st + block_size, original_grid_shape[1]])
-                            full_wavefield[0, line_st:line_end, px_st:px_end] += block_ls[i_src_rank][ind,
-                                                                                 safe_zone_width:safe_zone_width + (
-                                                                                             line_end - line_st),
-                                                                                 safe_zone_width:safe_zone_width + (
-                                                                                             px_end - px_st)]
+                if hdf5:
+                    f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
+                                                  'pfft_nslices_{}_output.h5'.format(n_slices)),
+                                      'w', driver='mpio', comm=comm)
+                    dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
+                    pos_ind_ls = range(rank, n_blocks, n_ranks)
+                    for ind, i_pos in enumerate(pos_ind_ls):
+                        line_st = i_pos // n_blocks_x * block_size
+                        line_end = min([line_st + block_size, original_grid_shape[0]])
+                        px_st = i_pos % n_blocks_x * block_size
+                        px_end = min([px_st + block_size, original_grid_shape[1]])
+                        dset[line_st:line_end, px_st:px_end] += wavefield[ind,
+                                                                          safe_zone_width:safe_zone_width + (line_end - line_st),
+                                                                          safe_zone_width:safe_zone_width + (px_end - px_st)]
+                    f_out.close()
                     dt += time.time() - t0
                     dt_ls[i, 0] = dt
                     dt_ls[i, 1] = time.time() - t_tot_0
+                else:
+                    block_ls = comm.gather(wavefield, root=0)
+                    if rank == 0:
+                        full_wavefield = np.zeros([n_batch, *original_grid_shape[:-1]], dtype=np.complex64)
+                        for i_src_rank in range(len(block_ls)):
+                            pos_ind_ls = range(i_src_rank, n_blocks, n_ranks)
+                            for ind, i_pos in enumerate(pos_ind_ls):
+                                line_st = i_pos // n_blocks_x * block_size
+                                line_end = min([line_st + block_size, original_grid_shape[0]])
+                                px_st = i_pos % n_blocks_x * block_size
+                                px_end = min([px_st + block_size, original_grid_shape[1]])
+                                full_wavefield[0, line_st:line_end, px_st:px_end] += block_ls[i_src_rank][ind,
+                                                                                     safe_zone_width:safe_zone_width + (
+                                                                                                 line_end - line_st),
+                                                                                     safe_zone_width:safe_zone_width + (
+                                                                                                 px_end - px_st)]
+                        dt += time.time() - t0
+                        dt_ls[i, 0] = dt
+                        dt_ls[i, 1] = time.time() - t_tot_0
 
-                    if i == 0:
-                        # dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size),
-                        #                                                       'pfft_nslices_{}_output.tiff'.format(
-                        #                                                           n_slices)), dtype='float32',
-                        #                     overwrite=True)
-                        np.save(os.path.join(path_prefix, 'size_{}'.format(this_size),
-                                             'pfft_nslices_{}_output'.format(n_slices)), np.squeeze(full_wavefield))
-                    # if rank == 0:
-                    #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
-                comm.Barrier()
+                        if i == 0:
+                            # dxchange.write_tiff(abs(full_wavefield), os.path.join(path_prefix, 'size_{}'.format(this_size),
+                            #                                                       'pfft_nslices_{}_output.tiff'.format(
+                            #                                                           n_slices)), dtype='float32',
+                            #                     overwrite=True)
+                            np.save(os.path.join(path_prefix, 'size_{}'.format(this_size),
+                                                 'pfft_nslices_{}_output'.format(n_slices)), np.squeeze(full_wavefield))
+                        # if rank == 0:
+                        #     np.savetxt(os.path.join(path_prefix, 'size_{}'.format(this_size), 'dt_all_repeats.txt'), dt_ls)
+            comm.Barrier()
 
         if rank == 0:
             dt_avg, dt_tot_avg = np.mean(dt_ls, axis=0)
