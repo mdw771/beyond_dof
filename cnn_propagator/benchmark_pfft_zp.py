@@ -95,6 +95,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
         #ref = dxchange.read_tiff(
         #    os.path.join(path_prefix, 'size_{}'.format(this_size), 'fft_output.tiff'))
 
+        print(lmbda_nm, psize_cm)
         safe_zone_width = ceil(
             4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
         print(safe_zone_width)

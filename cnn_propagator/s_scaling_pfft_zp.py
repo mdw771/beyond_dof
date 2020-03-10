@@ -66,7 +66,7 @@ psize_cm = parameters['step_xy'] * 1e2
 lmbda_nm = parameters['wavelength in m'] * 1e9
 energy_ev = parameters['energy(in eV)']
 focal_len_m = parameters['focal_length']
-thick_zp_cm = 10e-4
+thick_zp_cm = 30.808e-4
 free_prop_cm = 0
 slice_spacing_cm = thick_zp_cm / n_slices
 
@@ -191,6 +191,7 @@ for i in range(n_repeats):
             dset[line_st:line_end, px_st:px_end] += wavefield[ind,
                                                               safe_zone_width:safe_zone_width + (line_end - line_st),
                                                               safe_zone_width:safe_zone_width + (px_end - px_st)]
+        comm.Barrier()
         f_out.close()
         comm.Barrier()
         dt_write = time.time() - t_write_0
