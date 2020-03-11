@@ -196,7 +196,7 @@ for i in range(n_repeats):
         t_write_0 = time.time()
         comm.Barrier()
         f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes),
-                                      'pfft_nslices_{}_output.h5'.format(n_slices)),
+                                      'pfft_nslices_{}_output_{}.h5'.format(n_slices, i)),
                                       'w', driver='mpio', comm=comm)
         dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
         pos_ind_ls = range(rank, n_blocks, n_ranks)
