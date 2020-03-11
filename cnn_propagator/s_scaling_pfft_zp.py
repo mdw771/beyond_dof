@@ -23,7 +23,7 @@ n_repeats = 10
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', default='None')
-parser.add_argument('--nodes', default=1)
+parser.add_argument('--nodes', default=256)
 args = parser.parse_args()
 this_size = int(args.size)
 n_nodes = int(args.nodes)
@@ -63,7 +63,7 @@ if rank == 0:
 if rank == 0:
     f = open(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes), 'report_pfft.csv'), 'a')
     if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
-        f.write('i_repeat,n_nodes,this_size,n_slices,safe_zone_width,n_blocks_y,n_blocks_x,block_size,n_ranks,dt_total,dt_write,dt_fft_prop\n')
+        f.write('i_repeat,n_nodes,this_size,n_slices,safe_zone_width,n_blocks_y,n_blocks_x,block_size,n_ranks,dt_total,dt_read_div,dt_write,dt_fft_prop\n')
 
 # Benchmark partial FFT propagation
 
@@ -80,100 +80,108 @@ free_prop_cm = 0
 slice_spacing_cm = thick_zp_cm / n_slices
 
 if rank == 0: print('This size is {}. This n_slices is {}'.format(this_size, n_slices))
-img = np.load(os.path.join(path_prefix, 'size_{}', 'zp.npy').format(this_size), mmap_mode='r')
-img_shape = img.shape
-# grid_delta = np.ones([1, *img_shape, 1]) * img * delta
-# grid_beta = np.ones([1, *img_shape, 1]) * img * beta
-# grid_delta = np.swapaxes(np.swapaxes(grid_delta, 0, 1), 1, 2)
-# grid_beta = np.swapaxes(np.swapaxes(grid_beta, 0, 1), 1, 2)
-# grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
-# grid_beta = np.reshape(grid_beta, [1, *grid_beta.shape])
-n_batch = 1
-original_grid_shape = [img.shape[0], img.shape[1], 1]
-
-safe_zone_width = ceil(
-    4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
-# z_nm = slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7
-# safe_zone_width = np.sqrt(z_nm ** 2 / (4 * (psize_cm * 1e7) ** 2 / lmbda_nm ** 2 - 1))
-# safe_zone_width = ceil(1.1 * safe_zone_width)
-if rank == 0: print('  Safe zone width is {}.'.format(safe_zone_width))
-
-# Must satisfy:
-# 1. n_block_x * n_block_y = n_ranks
-# 2. block_size * n_block_y = wave_shape[0]
-# 3. block_size * n_block_x = wave_shape[1]
-
-# n_blocks_x = int(np.sqrt(float(n_ranks) * original_grid_shape[1] / original_grid_shape[0])) + 1
-# n_blocks_y = int(np.sqrt(float(n_ranks) * original_grid_shape[0] / original_grid_shape[1])) + 1
-# n_blocks = n_blocks_x * n_blocks_y
-# block_size = int(float(original_grid_shape[0]) / n_blocks_y) + 1
-n_blocks_y = int(np.sqrt(original_grid_shape[0] / original_grid_shape[1] * n_ranks))
-n_blocks_x = int(np.sqrt(original_grid_shape[1] / original_grid_shape[0] * n_ranks))
-n_blocks = n_blocks_x * n_blocks_y
-block_size = ceil(max([original_grid_shape[0] / n_blocks_y, original_grid_shape[1] / n_blocks_x]))
-if rank == 0:
-    print('n_blocks_y: ', n_blocks_y)
-    print('n_blocks_x: ', n_blocks_x)
-    print('n_blocks: ', n_blocks)
-    print('block_size: ', block_size)
-
-this_pos_ind_ls = range(rank, n_blocks, n_ranks)
-block_delta_batch = np.zeros(
-    [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width,
-     original_grid_shape[-1]])
-block_beta_batch = np.zeros(
-    [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width,
-     original_grid_shape[-1]])
-block_probe_real_batch = np.zeros(
-    [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width])
-block_probe_imag_batch = np.zeros(
-    [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width])
-
-for ind, i_pos in enumerate(this_pos_ind_ls):
-    line_st = i_pos // n_blocks_x * block_size
-    line_end = line_st + block_size
-    px_st = i_pos % n_blocks_x * block_size
-    px_end = px_st + block_size
-
-    # sub_grids are memmaps
-    sub_grid_delta = img[max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width,
-                                                                 original_grid_shape[0]),
-                     max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
-    sub_grid_beta = img[
-                    max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, original_grid_shape[0]),
-                    max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
-    sub_grid_delta = np.reshape(sub_grid_delta, [1, *sub_grid_delta.shape, 1]) * delta
-    sub_grid_beta = np.reshape(sub_grid_beta, [1, *sub_grid_beta.shape, 1]) * beta
-    sub_probe_real = np.ones(sub_grid_delta.shape[1:3])
-    sub_probe_imag = np.zeros(sub_grid_delta.shape[1:3])
-
-    # During padding, sub_grids are read into the RAM
-    pad_top, pad_bottom, pad_left, pad_right = (0, 0, 0, 0)
-    if line_st < safe_zone_width:
-        pad_top = safe_zone_width - line_st
-    if (original_grid_shape[0] - line_end) < safe_zone_width:
-        pad_bottom = line_end + safe_zone_width - original_grid_shape[0]
-    if px_st < safe_zone_width:
-        pad_left = safe_zone_width - px_st
-    if (original_grid_shape[1] - px_end) < safe_zone_width:
-        pad_right = px_end + safe_zone_width - original_grid_shape[1]
-    sub_grid_delta = np.pad(sub_grid_delta, [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
-                            mode='edge')
-    sub_grid_beta = np.pad(sub_grid_beta, [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
-                           mode='edge')
-    sub_probe_real = np.pad(sub_probe_real, [[pad_top, pad_bottom], [pad_left, pad_right]], mode='edge')
-    sub_probe_imag = np.pad(sub_probe_imag, [[pad_top, pad_bottom], [pad_left, pad_right]], mode='edge')
-
-    block_delta_batch[ind, :, :, :] = sub_grid_delta
-    block_beta_batch[ind, :, :, :] = sub_grid_beta
-    block_probe_real_batch[ind, :, :] = sub_probe_real
-    block_probe_imag_batch[ind, :, :] = sub_probe_imag
-
 
 for i in range(n_repeats):
+
+    t_tot_0 = time.time()
+
+    t_read_div_0 = time.time()
+    img = np.load(os.path.join(path_prefix, 'size_{}', 'zp.npy').format(this_size), mmap_mode='r')
+    img_shape = img.shape
+    # grid_delta = np.ones([1, *img_shape, 1]) * img * delta
+    # grid_beta = np.ones([1, *img_shape, 1]) * img * beta
+    # grid_delta = np.swapaxes(np.swapaxes(grid_delta, 0, 1), 1, 2)
+    # grid_beta = np.swapaxes(np.swapaxes(grid_beta, 0, 1), 1, 2)
+    # grid_delta = np.reshape(grid_delta, [1, *grid_delta.shape])
+    # grid_beta = np.reshape(grid_beta, [1, *grid_beta.shape])
+    n_batch = 1
+    original_grid_shape = [img.shape[0], img.shape[1], 1]
+
+    safe_zone_width = ceil(
+        4.0 * np.sqrt((slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7) * lmbda_nm) / (psize_cm * 1e7))
+    # z_nm = slice_spacing_cm * 1e7 * n_slices + free_prop_cm * 1e7
+    # safe_zone_width = np.sqrt(z_nm ** 2 / (4 * (psize_cm * 1e7) ** 2 / lmbda_nm ** 2 - 1))
+    # safe_zone_width = ceil(1.1 * safe_zone_width)
+    if rank == 0: print('  Safe zone width is {}.'.format(safe_zone_width))
+
+    # Must satisfy:
+    # 1. n_block_x * n_block_y = n_ranks
+    # 2. block_size * n_block_y = wave_shape[0]
+    # 3. block_size * n_block_x = wave_shape[1]
+
+    # n_blocks_x = int(np.sqrt(float(n_ranks) * original_grid_shape[1] / original_grid_shape[0])) + 1
+    # n_blocks_y = int(np.sqrt(float(n_ranks) * original_grid_shape[0] / original_grid_shape[1])) + 1
+    # n_blocks = n_blocks_x * n_blocks_y
+    # block_size = int(float(original_grid_shape[0]) / n_blocks_y) + 1
+    n_blocks_y = int(np.sqrt(original_grid_shape[0] / original_grid_shape[1] * n_ranks))
+    n_blocks_x = int(np.sqrt(original_grid_shape[1] / original_grid_shape[0] * n_ranks))
+    n_blocks = n_blocks_x * n_blocks_y
+    block_size = ceil(max([original_grid_shape[0] / n_blocks_y, original_grid_shape[1] / n_blocks_x]))
+    if rank == 0:
+        print('n_blocks_y: ', n_blocks_y)
+        print('n_blocks_x: ', n_blocks_x)
+        print('n_blocks: ', n_blocks)
+        print('block_size: ', block_size)
+
+    this_pos_ind_ls = range(rank, n_blocks, n_ranks)
+    block_delta_batch = np.zeros(
+        [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width,
+         original_grid_shape[-1]])
+    block_beta_batch = np.zeros(
+        [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width,
+         original_grid_shape[-1]])
+    block_probe_real_batch = np.zeros(
+        [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width])
+    block_probe_imag_batch = np.zeros(
+        [len(this_pos_ind_ls), block_size + 2 * safe_zone_width, block_size + 2 * safe_zone_width])
+
+    for ind, i_pos in enumerate(this_pos_ind_ls):
+        line_st = i_pos // n_blocks_x * block_size
+        line_end = line_st + block_size
+        px_st = i_pos % n_blocks_x * block_size
+        px_end = px_st + block_size
+
+        # sub_grids are memmaps
+        sub_grid_delta = img[max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width,
+                                                                     original_grid_shape[0]),
+                         max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
+        sub_grid_beta = img[
+                        max([0, line_st - safe_zone_width]):min(line_end + safe_zone_width, original_grid_shape[0]),
+                        max([0, px_st - safe_zone_width]):min([px_end + safe_zone_width, original_grid_shape[1]])]
+        sub_grid_delta = np.reshape(sub_grid_delta, [1, *sub_grid_delta.shape, 1]) * delta
+        sub_grid_beta = np.reshape(sub_grid_beta, [1, *sub_grid_beta.shape, 1]) * beta
+        sub_probe_real = np.ones(sub_grid_delta.shape[1:3])
+        sub_probe_imag = np.zeros(sub_grid_delta.shape[1:3])
+
+        # During padding, sub_grids are read into the RAM
+        pad_top, pad_bottom, pad_left, pad_right = (0, 0, 0, 0)
+        if line_st < safe_zone_width:
+            pad_top = safe_zone_width - line_st
+        if (original_grid_shape[0] - line_end) < safe_zone_width:
+            pad_bottom = line_end + safe_zone_width - original_grid_shape[0]
+        if px_st < safe_zone_width:
+            pad_left = safe_zone_width - px_st
+        if (original_grid_shape[1] - px_end) < safe_zone_width:
+            pad_right = px_end + safe_zone_width - original_grid_shape[1]
+        sub_grid_delta = np.pad(sub_grid_delta, [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
+                                mode='edge')
+        sub_grid_beta = np.pad(sub_grid_beta, [[0, 0], [pad_top, pad_bottom], [pad_left, pad_right], [0, 0]],
+                               mode='edge')
+        sub_probe_real = np.pad(sub_probe_real, [[pad_top, pad_bottom], [pad_left, pad_right]], mode='edge')
+        sub_probe_imag = np.pad(sub_probe_imag, [[pad_top, pad_bottom], [pad_left, pad_right]], mode='edge')
+
+        block_delta_batch[ind, :, :, :] = sub_grid_delta
+        block_beta_batch[ind, :, :, :] = sub_grid_beta
+        block_probe_real_batch[ind, :, :] = sub_probe_real
+        block_probe_imag_batch[ind, :, :] = sub_probe_imag
+
+    comm.Barrier()
+    dt_read_div = time.time() - t_read_div_0
+
+    # -------------------------------------
+
     if block_delta_batch.shape[0] > 0:
         comm.Barrier()
-        t_tot_0 = time.time()
         # -----------------------------------------
         wavefield, dt = multislice_propagate_batch_numpy(block_delta_batch, block_beta_batch,
                                                          block_probe_real_batch, block_probe_imag_batch, energy_ev,
@@ -211,7 +219,7 @@ for i in range(n_repeats):
 
     if rank == 0:
         print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_total))
-        f.write('{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(i, n_nodes, this_size, n_slices, safe_zone_width, n_blocks_y, n_blocks_x, block_size, n_ranks, dt_total, dt_write, dt_fft_prop))
+        f.write('{},{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(i, n_nodes, this_size, n_slices, safe_zone_width, n_blocks_y, n_blocks_x, block_size, n_ranks, dt_total, dt_read_div, dt_write, dt_fft_prop))
         f.flush()
         os.fsync(f.fileno())
 
