@@ -23,8 +23,10 @@ n_repeats = 10
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--size', default='None')
+parser.add_argument('--nodes', default=1)
 args = parser.parse_args()
 this_size = int(args.size)
+n_nodes = int(args.nodes)
 
 n_slices = converging_steps_dict[this_size]
 
@@ -50,11 +52,18 @@ path_prefix = os.path.join(os.getcwd(), 'zp')
 
 verbose = True if rank == 0 else False
 
+# Create folder
+if rank == 0:
+    try:
+        os.makedirs(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes)))
+    except:
+        print('Target folder exists.')
+
 # Create report
 if rank == 0:
-    f = open(os.path.join(path_prefix, 'report_pfft.csv'), 'a')
+    f = open(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes), 'report_pfft.csv'), 'a')
     if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
-        f.write('i,this_size,n_slices,safe_zone_width,n_blocks_y,n_blocks_x,block_size,n_ranks,dt_total,dt_write,dt_fft_prop\n')
+        f.write('i_repeat,n_nodes,this_size,n_slices,safe_zone_width,n_blocks_y,n_blocks_x,block_size,n_ranks,dt_total,dt_write,dt_fft_prop\n')
 
 # Benchmark partial FFT propagation
 
@@ -178,7 +187,7 @@ for i in range(n_repeats):
         # -----------------------------------------
         t_write_0 = time.time()
         comm.Barrier()
-        f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size),
+        f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes),
                                       'pfft_nslices_{}_output.h5'.format(n_slices)),
                                       'w', driver='mpio', comm=comm)
         dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
@@ -202,7 +211,7 @@ for i in range(n_repeats):
 
     if rank == 0:
         print('PFFT: For size {}, average dt = {} s.'.format(this_size, dt_total))
-        f.write('{},{},{},{},{},{},{},{},{},{},{}\n'.format(i, this_size, n_slices, safe_zone_width, n_blocks_y, n_blocks_x, block_size, n_ranks, dt_total, dt_write, dt_fft_prop))
+        f.write('{},{},{},{},{},{},{},{},{},{},{},{}\n'.format(i, n_nodes, this_size, n_slices, safe_zone_width, n_blocks_y, n_blocks_x, block_size, n_ranks, dt_total, dt_write, dt_fft_prop))
         f.flush()
         os.fsync(f.fileno())
 
