@@ -62,7 +62,7 @@ if rank == 0:
 # Create report
 if rank == 0:
     f = open(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes), 'report_pfft.csv'), 'a')
-    if os.path.getsize(os.path.join(path_prefix, 'report_pfft.csv')) == 0:
+    if os.path.getsize(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes), 'report_pfft.csv')) == 0:
         f.write('i_repeat,n_nodes,this_size,n_slices,safe_zone_width,n_blocks_y,n_blocks_x,block_size,n_ranks,dt_total,dt_read_div,dt_write,dt_fft_prop\n')
 
 # Benchmark partial FFT propagation
