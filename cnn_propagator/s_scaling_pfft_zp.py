@@ -205,7 +205,7 @@ for i in range(n_repeats):
             line_end = min([line_st + block_size, original_grid_shape[0]])
             px_st = i_pos % n_blocks_x * block_size
             px_end = min([px_st + block_size, original_grid_shape[1]])
-            dset[line_st:line_end, px_st:px_end] += wavefield[ind,
+            dset[line_st:line_end, px_st:px_end] = wavefield[ind,
                                                               safe_zone_width:safe_zone_width + (line_end - line_st),
                                                               safe_zone_width:safe_zone_width + (px_end - px_st)]
         comm.Barrier()
