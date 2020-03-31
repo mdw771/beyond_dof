@@ -123,41 +123,28 @@ def get_padding_lengths(line_st, line_end, px_st, px_end, original_grid_shape, s
 
 path_prefix = os.path.join(os.getcwd(), 'charcoal')
 ######################################################################
-psize_cm = 1e-7
-energy_ev = 25000
+psize_cm = 2e-7
+energy_ev = 15000
 
-# import xommons
-# delta1 = xommons.ri_delta('Al', energy_ev / 1e3, 2.7)
-# beta1 = xommons.ri_beta('Al', energy_ev / 1e3, 2.7)
-# delta2 = xommons.ri_delta('Au', energy_ev / 1e3, 19.32)
-# beta2 = xommons.ri_beta('Au', energy_ev / 1e3, 19.32)
-delta1 = 8.666320754358026e-07
-beta1 = 1.95600602233921e-09
-delta2 = 5.1053512407639445e-06
-beta2 = 3.3630855527288826e-07
-# print(delta, beta)
-# delta = 6.638119376400908e-07
-# beta = 2.4754720576473264e-10
-# delta = 5.1053512407639445e-06
-# beta = 3.3630855527288826e-07
+# Al
+delta1 = 2.4149E-06
+beta1  = 1.2994E-08
+# Au
+delta2 =  1.348e-05
+beta2  =  2.0209e-06
+
 if rank == 0: print('Refractive indices:', delta1, beta1)
 if rank == 0: print('Refractive indices:', delta2, beta2)
 safe_zone_factor = 2
-safe_zone_width = 192
+safe_zone_width = 101
 
 lmbda_nm = 1240. / energy_ev
 n_slices_repeating = 50
-n_slices_max = 1000
+n_slices_max = 500
 # size_ls = 4096 * np.array([1, 2, 4, 8, 16]).astype('int')
 size_ls = [4096]
-n_slices_ls = np.arange(25, 1001, 25)
-# n_slices_ls = [99, 100]
-# n_slices_ls = [1000]
-# n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
-# size_ls = [256]
-# n_slices_ls = [10]
-# thick_zp_cm = n_slices_max * psize_cm
-thick_zp_cm = 110e-4
+n_slices_ls = np.arange(10, 501, 10)
+thick_zp_cm = 147.4615e-6*1e2
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--thickness_um', default='None')
@@ -178,7 +165,7 @@ n_repeats = 1
 verbose = True if rank == 0 else False
 
 # Create report
-sub_folder = 'size_4096/Al_Au_{}nm_{}um'.format(int(psize_cm * 1e7), int(thick_zp_cm * 1e4))
+sub_folder = 'size_4096/Al_Au_{}nm_{}um_n{}'.format(int(psize_cm * 1e7), int(thick_zp_cm * 1e4), n_ranks)
 
 if rank == 0:
     if not os.path.exists(os.path.join(path_prefix, sub_folder)):
@@ -341,7 +328,7 @@ for this_size in np.take(size_ls, range(i_starting_size, len(size_ls))):
                     os.makedirs(save_path)
                 f_out = h5py.File(os.path.join(save_path, 'pfft_nslices_{}_output.h5'.format(n_slices)),
                                   'w', driver='mpio', comm=comm)
-                dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
+                dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64', chunks=True)
                 pos_ind_ls = range(rank, n_blocks, n_ranks)
                 for ind, i_pos in enumerate(pos_ind_ls):
                     line_st = i_pos // n_blocks_x * block_size

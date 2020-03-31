@@ -61,7 +61,7 @@ if rank == 0:
 
 # Create report
 if rank == 0:
-    f = open(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes), 'report_pfft.csv'), 'a')
+    f = open(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes), 'report_pfft.csv'), 'w')
     if os.path.getsize(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes), 'report_pfft.csv')) == 0:
         f.write('i_repeat,n_nodes,this_size,n_slices,safe_zone_width,n_blocks_y,n_blocks_x,block_size,n_ranks,dt_total,dt_read_div,dt_write,dt_fft_prop\n')
 
@@ -198,7 +198,8 @@ for i in range(n_repeats):
         f_out = h5py.File(os.path.join(path_prefix, 'size_{}'.format(this_size), 'nd_{}'.format(n_nodes),
                                       'pfft_nslices_{}_output_{}.h5'.format(n_slices, i)),
                                       'w', driver='mpio', comm=comm)
-        dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64')
+        print(wavefield.dtype)
+        dset = f_out.create_dataset('wavefield', original_grid_shape[:-1], dtype='complex64', chunks=True)
         pos_ind_ls = range(rank, n_blocks, n_ranks)
         for ind, i_pos in enumerate(pos_ind_ls):
             line_st = i_pos // n_blocks_x * block_size
