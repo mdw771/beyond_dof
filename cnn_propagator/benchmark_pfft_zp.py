@@ -37,7 +37,7 @@ def save_checkpoint(this_size_ind, this_nslice_ind):
 
 path_prefix = os.path.join(os.getcwd(), 'zp')
 ######################################################################
-size_ls = 4096 * np.array([16]).astype('int')
+size_ls = 4096 * np.array([1]).astype('int')
 n_slices_ls = np.arange(20, 25, 1)
 # n_slices_ls = np.concatenate([n_slices_ls, np.arange(50, 101, 5)])
 # n_slices_ls = list(range(10, 100, 5)) + list(range(100, 600, 25))
